@@ -63,7 +63,9 @@ def main():
         #-----uncomment next line to increase number of max search result, default is 5.-----#
         #maxResult = int(input("\033[96mEnter the maximum number of search results: "))
         #-----uncomment next line to enable video download, default is only audio.-----#
-        #mode = not bool(input("\033[0;34mEnter 0 for video(low res) or anything else for audio: \033[0m"))
+        condition = int(input("\033[0;34mEnter 0 for video(low res) or anything else for audio: \033[0m"))
+        if condition == 0: mode = True
+        else: mode = False
         topResults(name, mode, maxResult)
     except:
         print("\033[91mUnexpected ERROR!\033[0m")
