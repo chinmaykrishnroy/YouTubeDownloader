@@ -42,6 +42,7 @@ def downloadMedia(videoID, videoName, av=False):
         print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing YouTube library!\033[0m\033[0m")
         return
     location = "C:/Users/morph/Downloads" # set folder location here
+    #location = "/storage/emulated/0/Download" # Uncomment this line if using in Android and comment the above line
     print("\033[6m\033[1;30mDOWNLOADING...\033[0m\033[0m")
     if av:
         mediaStream = yt.streams.get_highest_resolution()
