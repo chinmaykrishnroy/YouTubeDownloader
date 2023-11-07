@@ -62,10 +62,10 @@ def main():
         name, mode, maxResult= input("\033[93mEnter the NAME or YouTube link of the video: \033[0m"), False, 5
         #-----uncomment next line to increase number of max search result, default is 5.-----#
         #maxResult = int(input("\033[96mEnter the maximum number of search results: "))
-        #-----uncomment next line to enable video download, default is only audio.-----#
-        condition = int(input("\033[0;34mEnter 0 for video(low res) or anything else for audio: \033[0m"))
-        if condition == 0: mode = True
-        else: mode = False
+        #-----uncomment next lines to enable video download, default is only audio.-----#
+        #condition = int(input("\033[0;34mEnter 0 for video(low res) or anything else for audio: \033[0m"))
+        #if condition == 0: mode = True
+        #else: mode = False
         topResults(name, mode, maxResult)
     except:
         print("\033[91mUnexpected ERROR!\033[0m")
