@@ -1,11 +1,23 @@
-#YouTube Audio Downloader (also downloads video)
-#Downloads YouTube Audio @128kBps and Video @480p
-#Created by Chinmay Krishn Roy
-#https://github.com/chinmaykrishnroy
-#https://www.linkedin.com/in/chinmaykrishnroy/
+# YouTube Audio Downloader (also downloads video)
+# Downloads YouTube Audio @128kBps and Video @480p
+# Created by Chinmay Krishn Roy
+# https://github.com/chinmaykrishnroy
+# https://www.linkedin.com/in/chinmaykrishnroy/
 
+invalidFilenameChars = ['|', '"', "'", ':', '*', '?', '\\', '/', '<', '>']
 logo = ("\033[7m\033[93mP\033[0m\033[7m\033[1;37mR\033[0m\033[7m\033[93mE\033[0m\033[7m\033"
         "[1;37mF\033[0m\033[7m\033[93mE\033[0m\033[7m\033[1;37mC\033[0m\033[7m\033[93mT\033[0m")
+
+
+def validFileName(fileName, invalidASCII):
+    invalidCharIndex = []
+    for i in range(len(invalidASCII)):
+        for j in range(len(fileName)):
+            if fileName[j] == invalidASCII[i]: invalidCharIndex.append(j)
+    invalidCharIndex.sort()
+    if len(fileName[:invalidCharIndex[0]].strip()): return fileName[:invalidCharIndex[0]].strip()
+    else: return ''.join(list(filter(lambda x: fileName.index(x) not in invalidCharIndex, fileName)))
+
 
 def topResults(videoName, mode=False, maxLimit=5):
     tryURL = videoName.strip()[::-1]
@@ -29,7 +41,7 @@ def topResults(videoName, mode=False, maxLimit=5):
         if 1 <= selectedIndex <= maxLimit:
             selectedVideo = results[selectedIndex - 1]
             try: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
-            except: downloadMedia(selectedVideo["id"], videoName, mode)
+            except: downloadMedia(selectedVideo["id"], validFileName(selectedVideo["title"], invalidFilenameChars), mode)
     except: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
 
 
@@ -41,32 +53,32 @@ def downloadMedia(videoID, videoName, av=False):
     except:
         print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing YouTube library!\033[0m\033[0m")
         return
-    location = "C:/Users/morph/Downloads" # set folder location here
-    #location = "/storage/emulated/0/Download" # Uncomment this line if using in Android and comment the above line
-    print("\033[6m\033[1;30mDOWNLOADING...\033[0m\033[0m")
+    location = "C:/Users/morph/Downloads"  # set folder location here
+    # location = "/storage/emulated/0/Download" # Uncomment this line if using in Android and comment the above line
+    print("\r\033[6m\033[1;30mDOWNLOADING...\033[0m\033[0m", end='')
     if av:
         mediaStream = yt.streams.get_highest_resolution()
-        outputPath = location + "/YouTube Video" #dir of video = folder location/YouTube Video
+        outputPath = location + "/YouTube Video" # dir of video = folder location/YouTube Video
         fileName = f"{videoName}.mp4"
         mediaStream.download(outputPath, filename=fileName)
     else:
         mediaStream = yt.streams.filter(only_audio=True).first()
-        outputPath = location + "/YouTube Audio" #dir of audio = folder location/YouTube Audio
+        outputPath = location + "/YouTube Audio" # dir of audio = folder location/YouTube Audio
         fileName = f"{videoName}.mp3"
         mediaStream.download(outputPath, filename=fileName)
-    print("\n\033[92mDOWNLOADED SUCCESSFULLY!\033[0m")
+    print("\r\033[92mDOWNLOADED SUCCESSFULLY!\033[0m")
 
 
 def main():
     try:
         print(logo)
         name, mode, maxResult= input("\033[93mEnter the NAME or YouTube link of the video: \033[0m"), False, 5
-        #-----uncomment next line to increase number of max search result, default is 5.-----#
-        #maxResult = int(input("\033[96mEnter the maximum number of search results: "))
-        #-----uncomment next lines to enable video download, default is only audio.-----#
-        #condition = int(input("\033[0;34mEnter 0 for video(low res) or anything else for audio: \033[0m"))
-        #if condition == 0: mode = True
-        #else: mode = False
+        # -----uncomment next line to increase number of max search result, default is 5.-----#
+        # maxResult = int(input("\033[96mEnter the maximum number of search results: "))
+        # -----uncomment next lines to enable video download, default is only audio.-----#
+        # condition = int(input("\033[0;34mEnter 0 for video(low res) or anything else for audio: \033[0m"))
+        # if condition == 0: mode = True
+        # else: mode = False
         topResults(name, mode, maxResult)
     except:
         print("\033[91mUnexpected ERROR!\033[0m")
@@ -80,8 +92,8 @@ def mainloop():
             if condition==0: loop = False
         except: print("\033[7mBad Luck!\033[0m")
 
-#-----Use main() to execute program once or use mainloop() for multiple download-----#
-#-----Default is mainloop()-----#
+# -----Use main() to execute program once or use mainloop() for multiple download-----#
+# -----Default is mainloop()-----#
 
 if __name__ == '__main__':
     #main()
