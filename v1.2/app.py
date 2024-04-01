@@ -1,4 +1,3 @@
-from flask import Flask, render_template, request
 invalidFilenameChars = ['|', '"', "'", ':', '*', '?', '\\', '/', '<', '>']
 logo = ("\033[7m\033[93mP\033[0m\033[7m\033[1;37mR\033[0m\033[7m\033[93mE\033[0m\033[7m\033"
         "[1;37mF\033[0m\033[7m\033[93mE\033[0m\033[7m\033[1;37mC\033[0m\033[7m\033[93mT\033[0m")
@@ -59,6 +58,7 @@ def downloadMedia(videoID, videoName, av=False):
         mediaStream.download(outputPath, filename=fileName)
     print("\r\033[92mDOWNLOADED SUCCESSFULLY!\033[0m")
 
+from flask import Flask, render_template, request
 app = Flask(__name__)
 
 @app.route('/')
