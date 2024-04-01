@@ -10,6 +10,9 @@ For Windows Machine
 For Linux Machine
 > click [run.sh](https://github.com/chinmaykrishnroy/YouTubeDownloader/blob/main/v1.0/run.sh)
 
+For Other Machines:
+On Android, use PyDroid 3 and download the packages mentioned in the requirements.txt using pip. 
+
 ## v1.0
 The command line is quite simple and self-explanatory:
 ![Screenshot 2023-11-07 065056](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/0601813c-3e01-4cf0-9159-f002f4abf2c8)
