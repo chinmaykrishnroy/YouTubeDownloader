@@ -69,7 +69,8 @@ def index():
 def process_data():
     if request.method == 'POST':
         data = request.form['input_data']
-        topResults(data, mode=False, maxLimit=1)  #Make mode=True for video downloading
+        # Make mode=True for video downloading
+        topResults(data, mode=False, maxLimit=1)
         # Perform some processing with the data
         processed_data = data.upper()
         return processed_data + " DOWNLOADED!"
