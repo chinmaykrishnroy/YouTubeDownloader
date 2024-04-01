@@ -73,7 +73,7 @@ def process_data():
         topResults(data, mode=False, maxLimit=1)
         # Perform some processing with the data
         processed_data = data.upper()
-            if processed_data.strip() == "": return
+        if processed_data.strip() == "": return
         return processed_data + " DOWNLOADED!"
 
 if __name__ == '__main__':
