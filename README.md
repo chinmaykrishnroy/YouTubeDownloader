@@ -3,7 +3,7 @@ This Python program is designed for easily downloading audio from YouTube and ca
 
 **!!Don't forget to correct the user directory name in line 56 of main.py in v1.0 and line 47 of app.py in v1.2!!!**
 
-###How to use the app?
+### How to use the app?
 For Windows Machine
 > click [run.bat](https://github.com/chinmaykrishnroy/YouTubeDownloader/blob/main/v1.0/run.bat)
 
