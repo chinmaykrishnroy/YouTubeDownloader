@@ -42,7 +42,7 @@ def topResults(videoName, mode=False, maxLimit=5):
             selectedVideo = results[selectedIndex - 1]
             try: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
             except: downloadMedia(selectedVideo["id"], validFileName(selectedVideo["title"], invalidFilenameChars), mode)
-    except: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
+    except: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\n\033[94mcheck line 56 of source code and in location, edit and correct the user of your PC!\033[0m\033[0m\033[0m")
 
 
 def downloadMedia(videoID, videoName, av=False):
@@ -98,3 +98,4 @@ def mainloop():
 if __name__ == '__main__':
     #main()
     mainloop()
+
