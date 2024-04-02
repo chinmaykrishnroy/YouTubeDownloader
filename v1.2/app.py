@@ -86,7 +86,7 @@ def process_data():
         topResults(data, mode=False, maxLimit=1)
         # Perform some processing with the data
         processed_data = data.upper()
-        return processed_data + " DOWNLOADED!"
+        return render_template('downloaded.html')
 
 if __name__ == '__main__':
     app.run(debug=False)
