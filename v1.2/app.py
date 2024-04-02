@@ -42,8 +42,9 @@ def topResults(videoName, mode=False, maxLimit=5):
         selectedIndex = 1 #int(input("\033[93mEnter the number of the video you want to download: \033[0m"))
         if 1 <= selectedIndex <= maxLimit:
             selectedVideo = results[selectedIndex - 1]
-            try: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
-            except: downloadMedia(selectedVideo["id"], validFileName(selectedVideo["title"], invalidFilenameChars), mode)
+            mediaName = validFileName(selectedVideo["title"], invalidFilenameChars)
+            try: downloadMedia(selectedVideo["id"], mediaName, mode)
+            except: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
         else: print("\033[91mNot a valid choice!\033[0m\033[0m")
     except: print("\r\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
 
