@@ -42,7 +42,8 @@ def topResults(videoName, mode=False, maxLimit=5):
             selectedVideo = results[selectedIndex - 1]
             try: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
             except: downloadMedia(selectedVideo["id"], validFileName(selectedVideo["title"], invalidFilenameChars), mode)
-    except: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\n\033[94mcheck line 56 of source code and in location, edit and correct the user of your PC!\033[0m\033[0m\033[0m")
+        else: print("\033[91mNot a valid choice!\033[0m\033[0m")
+    except: print("\r\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
 
 
 def downloadMedia(videoID, videoName, av=False):
@@ -82,7 +83,7 @@ def main():
         # else: mode = False
         topResults(name, mode, maxResult)
     except:
-        print("\033[91mUnexpected ERROR!\033[0m")
+        print("\r\033[91mUnexpected ERROR!\n\033[0m")
 
 def mainloop():
     loop = True
@@ -91,7 +92,7 @@ def mainloop():
             main()
             condition = int(input("\033[94mEnter 0 to exit or anything to download another video: \033[0m"))
             if condition==0: loop = False
-        except: print("\033[7mBad Luck!\033[0m")
+        except: print("\033[7mBad Luck!\n\033[0m")
 
 # -----Use main() to execute program once or use mainloop() for multiple download-----#
 # -----Default is mainloop()-----#
@@ -99,4 +100,3 @@ def mainloop():
 if __name__ == '__main__':
     #main()
     mainloop()
-
