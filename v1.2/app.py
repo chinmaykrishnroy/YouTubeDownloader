@@ -39,7 +39,7 @@ def topResults(videoName, mode=False, maxLimit=5):
             return
         for i, video in enumerate(results, 1):
             print(f"\033[1m{i}\033[0m. \033[95m{video['title']}\033[0m - {video['link']}")
-        selectedIndex = int(input("\033[93mEnter the number of the video you want to download: \033[0m"))
+        selectedIndex = 1 #int(input("\033[93mEnter the number of the video you want to download: \033[0m"))
         if 1 <= selectedIndex <= maxLimit:
             selectedVideo = results[selectedIndex - 1]
             try: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
