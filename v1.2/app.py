@@ -37,10 +37,15 @@ def topResults(videoName, mode=False, maxLimit=5):
         if not len(results):
             print("\033[0;31mnot found any search result!\033[0m\033[0m")
             return
-        selectedVideo = results[0]
-        try: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
-        except: downloadMedia(selectedVideo["id"], validFileName(selectedVideo["title"], invalidFilenameChars), mode)
-    except: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
+        for i, video in enumerate(results, 1):
+            print(f"\033[1m{i}\033[0m. \033[95m{video['title']}\033[0m - {video['link']}")
+        selectedIndex = int(input("\033[93mEnter the number of the video you want to download: \033[0m"))
+        if 1 <= selectedIndex <= maxLimit:
+            selectedVideo = results[selectedIndex - 1]
+            try: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
+            except: downloadMedia(selectedVideo["id"], validFileName(selectedVideo["title"], invalidFilenameChars), mode)
+        else: print("\033[91mNot a valid choice!\033[0m\033[0m")
+    except: print("\r\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
 
 
 def downloadMedia(videoID, videoName, av=False):
