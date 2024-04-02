@@ -28,6 +28,8 @@ Video downloading commands:
 Downloaded video:
 ![image](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/b6647fc4-8114-4b83-9952-bbad8d0e177a)
 
+
+
 ## v1.2
 It is even simpler than v1.0 as there is UI hosted by Flask (default on 127.0.0.1:5000). After launching app.py or run.bat, use the browser to open the page hosted by Flask (default on 127.0.0.1:5000, so type this IP address in your browser). The UI should look something like this:
 ![Screenshot 2024-04-02 031418](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/36f29a28-cc8a-4b34-a714-70989059eba5)
