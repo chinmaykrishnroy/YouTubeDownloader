@@ -1,3 +1,5 @@
+import os
+username = os.environ.get('USERNAME')
 invalidFilenameChars = ['|', '"', "'", ':', '*', '?', '\\', '/', '<', '>']
 logo = ("\033[7m\033[93mP\033[0m\033[7m\033[1;37mR\033[0m\033[7m\033[93mE\033[0m\033[7m\033"
         "[1;37mF\033[0m\033[7m\033[93mE\033[0m\033[7m\033[1;37mC\033[0m\033[7m\033[93mT\033[0m")
@@ -32,7 +34,7 @@ def topResults(videoName, mode=False, maxLimit=5):
         selectedVideo = results[0]
         try: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
         except: downloadMedia(selectedVideo["id"], validFileName(selectedVideo["title"], invalidFilenameChars), mode)
-    except: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\n\033[94mcheck line 47 of source code and in location, edit and correct the user of your PC!\033[0m\033[0m\033[0m")
+    except: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
 
 
 def downloadMedia(videoID, videoName, av=False):
@@ -43,7 +45,7 @@ def downloadMedia(videoID, videoName, av=False):
     except:
         print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing YouTube library!\033[0m\033[0m")
         return
-    location = "C:/Users/<User>/Downloads"  # set folder location here
+    location = "C:/Users/%s/Downloads"%username  # set folder location here
     # location = "/storage/emulated/0/Download" # Uncomment this line if using in Android and comment the above line
     print("\r\033[6m\033[1;30mDOWNLOADING...\033[0m\033[0m", end='')
     if av:
