@@ -90,7 +90,7 @@ def mainloop():
     while loop:
         try:
             main()
-            condition = int(input("\033[94mEnter 0 to exit or anything to download another video: \033[0m"))
+            condition = int(input("\033[94mEnter 0 to exit or anything to download another media: \033[0m"))
             if condition==0: loop = False
         except: print("\033[7mBad Luck!\n\033[0m")
 
