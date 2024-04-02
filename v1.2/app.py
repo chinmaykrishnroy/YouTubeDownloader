@@ -1,3 +1,9 @@
+# YouTube Audio Downloader (also downloads video)
+# Downloads YouTube Audio @128kBps and Video @480p
+# Created by Chinmay Krishn Roy
+# https://github.com/chinmaykrishnroy
+# https://www.linkedin.com/in/chinmaykrishnroy/
+
 import os
 username = os.environ.get('USERNAME')
 invalidFilenameChars = ['|', '"', "'", ':', '*', '?', '\\', '/', '<', '>']
