@@ -14,6 +14,7 @@ def validFileName(fileName, invalidASCII):
     for i in range(len(invalidASCII)):
         for j in range(len(fileName)):
             if fileName[j] == invalidASCII[i]: invalidCharIndex.append(j)
+    if len(invalidCharIndex) == 0: return fileName
     invalidCharIndex.sort()
     if len(fileName[:invalidCharIndex[0]].strip()): return fileName[:invalidCharIndex[0]].strip()
     else: return ''.join(list(filter(lambda x: fileName.index(x) not in invalidCharIndex, fileName)))
