@@ -4,7 +4,6 @@
 # https://github.com/chinmaykrishnroy
 # https://www.linkedin.com/in/chinmaykrishnroy
 
-username = os.environ.get('USERNAME')
 invalidFilenameChars = ['|', '"', "'", ':', '*', '?', '\\', '/', '<', '>']
 logo = ("\033[7m\033[93mP\033[0m\033[7m\033[1;37mR\033[0m\033[7m\033[93mE\033[0m\033[7m\033"
         "[1;37mF\033[0m\033[7m\033[93mE\033[0m\033[7m\033[1;37mC\033[0m\033[7m\033[93mT\033[0m")
