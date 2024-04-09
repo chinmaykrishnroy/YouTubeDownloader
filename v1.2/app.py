@@ -92,7 +92,8 @@ def process_data():
         # Perform some processing with the data
         processed_data = data.upper()
         return render_template('downloaded.html')
-
+import webbrowser
 if __name__ == '__main__':
+    webbrowser.open("http://127.0.0.1:5000")
     app.run(debug=False)
 
