@@ -26,26 +26,26 @@ def topResults(videoName, mode=False, maxLimit=5):
         try: downloadMedia(videoName, tryURL[0:10], mode)
         except: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37minvalid link\033[0m\033[0m")
         return
-    #try:
-    from youtubesearchpython import VideosSearch
-    try: videosSearch = VideosSearch(videoName, limit=maxLimit)
-    except:
-        print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing video_search library!\033[0m\033[0m")
-        return
-    results = videosSearch.result()["result"]
-    if not len(results):
-        print("\033[0;31mnot found any search result!\033[0m\033[0m")
-        return
-    for i, video in enumerate(results, 1):
-        print(f"\033[1m{i}\033[0m. \033[95m{video['title']}\033[0m - {video['link']}")
-    selectedIndex = 1 #int(input("\033[93mEnter the number of the video you want to download: \033[0m"))
-    if 1 <= selectedIndex <= maxLimit:
-        selectedVideo = results[selectedIndex - 1]
-        mediaName = validFileName(selectedVideo["title"], invalidFilenameChars)
-        try: downloadMedia(selectedVideo["id"], mediaName, mode)
-        except: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
-    else: print("\033[91mNot a valid choice!\033[0m\033[0m")
-    #except: print("\r\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
+    try:
+        from youtubesearchpython import VideosSearch
+        try: videosSearch = VideosSearch(videoName, limit=maxLimit)
+        except:
+            print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing video_search library!\033[0m\033[0m")
+            return
+        results = videosSearch.result()["result"]
+        if not len(results):
+            print("\033[0;31mnot found any search result!\033[0m\033[0m")
+            return
+        for i, video in enumerate(results, 1):
+            print(f"\033[1m{i}\033[0m. \033[95m{video['title']}\033[0m - {video['link']}")
+        selectedIndex = 1 #int(input("\033[93mEnter the number of the video you want to download: \033[0m"))
+        if 1 <= selectedIndex <= maxLimit:
+            selectedVideo = results[selectedIndex - 1]
+            mediaName = validFileName(selectedVideo["title"], invalidFilenameChars)
+            try: downloadMedia(selectedVideo["id"], mediaName, mode)
+            except: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
+        else: print("\033[91mNot a valid choice!\033[0m\033[0m")
+    except: print("\r\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing library or index error!\033[0m\033[0m")
 
 
 def downloadMedia(videoID, videoName, av=False):
