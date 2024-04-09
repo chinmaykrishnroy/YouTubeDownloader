@@ -4,6 +4,7 @@
 # https://github.com/chinmaykrishnroy
 # https://www.linkedin.com/in/chinmaykrishnroy
 
+username = os.environ.get('USERNAME')
 invalidFilenameChars = ['|', '"', "'", ':', '*', '?', '\\', '/', '<', '>']
 logo = ("\033[7m\033[93mP\033[0m\033[7m\033[1;37mR\033[0m\033[7m\033[93mE\033[0m\033[7m\033"
         "[1;37mF\033[0m\033[7m\033[93mE\033[0m\033[7m\033[1;37mC\033[0m\033[7m\033[93mT\033[0m")
@@ -56,9 +57,9 @@ def downloadMedia(videoID, videoName, av=False):
     except:
         print("\033[91mERROR!\033[0m\t\033[3m\033[0;37mmissing YouTube library!\033[0m\033[0m")
         return
-    import platform
-    if platform.system() == "Windows": location = "C:/Users/%s/Downloads"%username
-    elif platform.system() == "Linux": location = "/home/%s/Downloads"%username
+    import os, platform
+    if platform.system() == "Windows": location = "C:/Users/%s/Downloads"%os.getlogin()
+    elif platform.system() == "Linux": location = "/home/%s/Downloads"%os.getlogin()
     elif platform.system() == "Android": location = "/storage/emulated/0/Download"
     else: location = ""
     print("\r\033[6m\033[1;30mDOWNLOADING...\033[0m\033[0m", end='')
