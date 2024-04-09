@@ -58,9 +58,9 @@ def downloadMedia(videoID, videoName, av=False):
         return
     import os, platform
     if platform.system() == "Windows": location = "C:/Users/%s/Downloads"%os.getlogin()
+    elif os.getlogin()[::-1].endswith('_0u'): location = "/storage/emulated/0/Download"
     elif platform.system() == "Linux": location = "/home/%s/Downloads"%os.getlogin()
     elif platform.system() == "Darwin": location = "/Users/%s/Downloads"%os.getlogin()
-    elif os.getlogin()[::-1].endswith('_0u'): location = "/storage/emulated/0/Download"
     else: location = ""
     print("\r\033[6m\033[1;30mDOWNLOADING...\033[0m\033[0m", end='')
     if av:
