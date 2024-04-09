@@ -8,7 +8,6 @@ invalidFilenameChars = ['|', '"', "'", ':', '*', '?', '\\', '/', '<', '>']
 logo = ("\033[7m\033[93mP\033[0m\033[7m\033[1;37mR\033[0m\033[7m\033[93mE\033[0m\033[7m\033"
         "[1;37mF\033[0m\033[7m\033[93mE\033[0m\033[7m\033[1;37mC\033[0m\033[7m\033[93mT\033[0m")
 
-
 def validFileName(fileName, invalidASCII):
     invalidCharIndex = []
     for i in range(len(invalidASCII)):
@@ -92,6 +91,7 @@ def process_data():
         # Perform some processing with the data
         processed_data = data.upper()
         return render_template('downloaded.html')
+        
 import webbrowser
 if __name__ == '__main__':
     webbrowser.open("http://127.0.0.1:5000")
