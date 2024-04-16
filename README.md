@@ -1,5 +1,5 @@
 ### Update
-*Added Audio/Video select button to v1.2*
+*Added Audio/Video select button to v1.2*<br>
 *Resolved compatibility issues for Linux and Android machines*
 
 # YouTubeDownloader
