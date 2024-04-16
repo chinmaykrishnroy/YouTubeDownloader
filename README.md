@@ -47,4 +47,4 @@ It is even simpler than v1.0 as there is UI hosted by Flask (default on 127.0.0.
 
 ### Note:
 Audios and videos will be saved in Downloads\YouTube Audio and Download\YouTube Video respectively on Windows machines.<br>
-[text goes here](#TOP) 
+[Go to Top](#TOP) 
