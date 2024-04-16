@@ -7,7 +7,7 @@ This Python program is designed for easily downloading audio from YouTube and ca
 
 **Make sure that Python 3 and Pip is successfully installed on your machine before using the software**<br>
 **Use the following command to check whether Python 3 and Pip is successfully installed on your machine**
-> python --version
+> python --version <br>
 > pip --version
 
 ### How to use the app?
