@@ -1,4 +1,4 @@
-[YouTube Downloader](https://github.com/chinmaykrishnroy/YouTubeDownloader/archive/refs/heads/main.zip)
+click [YouTube Downloader](https://github.com/chinmaykrishnroy/YouTubeDownloader/archive/refs/heads/main.zip) to download as ZIP.
 ### Update
 *Added Audio/Video select button to v1.2*<br>
 *Resolved compatibility issues for Linux and Android machines*
