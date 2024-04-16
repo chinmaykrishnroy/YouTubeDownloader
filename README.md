@@ -1,3 +1,4 @@
+[YouTube Downloader](https://github.com/chinmaykrishnroy/YouTubeDownloader/archive/refs/heads/main.zip)
 ### Update
 *Added Audio/Video select button to v1.2*<br>
 *Resolved compatibility issues for Linux and Android machines*
