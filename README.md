@@ -5,6 +5,10 @@
 # YouTubeDownloader
 This Python program is designed for easily downloading audio from YouTube and can also download YouTube videos, albeit in a lower resolution (480p). Works on Windows, Android, Linux, MacOS, etc. Feel free to use and enjoy it.
 
+**Make sure that Python 3 and Pip is successfully installed on your machine before using the software**<br>
+**Use the following command to check whether Python 3 and Pip is successfully installed on your machine**
+> python --version
+> pip --version
 
 ### How to use the app?
 For Windows Machine
