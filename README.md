@@ -1,7 +1,6 @@
 ### Update
 * *Added Audio/Video select button to v1.2*<br>
-* *Resolved compatibility issues for Linux and Android machines*
-#^
+* *Resolved compatibility issues for Linux and Android machines*<br>
 click [YouTube Downloader](https://github.com/chinmaykrishnroy/YouTubeDownloader/archive/refs/heads/main.zip) to download as ZIP.
 # YouTubeDownloader
 This Python program is designed for easily downloading audio from YouTube and can also download YouTube videos, albeit in a lower resolution. Works on Windows, Android, Linux, MacOS, etc. Feel free to use and enjoy it.
@@ -48,3 +47,5 @@ It is even simpler than v1.0 as there is UI hosted by Flask (default on 127.0.0.
 
 ### Note:
 Audios and videos will be saved in Downloads\YouTube Audio and Download\YouTube Video respectively on Windows machines.
+Markup : [text goes here](#section_name)
+          section_title<a name="section_name"></a>  
