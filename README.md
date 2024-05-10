@@ -22,6 +22,10 @@ For Linux Machine
 For Other Machines:
 On Android, use PyDroid 3 and download the packages mentioned in the requirements.txt using pip. 
 
+### Android Installation Process:
+Download [Pydroid 3](https://play.google.com/store/apps/details?id=ru.iiec.pydroid3&pli=1) from the Google Play store and give all the necessary permissions and follow the below steps:<be>
+![mobile_installation](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/6b5560d6-d728-4645-9688-9d32b675d6dc)
+
 ## v1.0
 The command line is quite simple and self-explanatory:
 ![Screenshot 2023-11-07 065056](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/0601813c-3e01-4cf0-9159-f002f4abf2c8)
@@ -48,7 +52,3 @@ It is even simpler than v1.0 as there is UI hosted by Flask (default on 127.0.0.
 ### Note:
 Audios and videos will be saved in Downloads\YouTube Audio and Download\YouTube Video respectively on Windows machines.<br>
 [Go to Top](#TOP) 
-
-### Android Installation Process:
-Download [Pydroid 3](https://play.google.com/store/apps/details?id=ru.iiec.pydroid3&pli=1) from the Google Play store and give all the necessary permissions and follow the below steps:<be>
-![mobile_installation](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/6b5560d6-d728-4645-9688-9d32b675d6dc)
