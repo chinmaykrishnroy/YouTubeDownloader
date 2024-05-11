@@ -93,7 +93,10 @@ def process_data():
         return render_template('downloaded.html')
         
 import webbrowser
+import os
+port = os.environ.get('PORT', 5000)
+host = os.environ.get('HOST', '0.0.0.0')
 if __name__ == '__main__':
-    webbrowser.open("http://127.0.0.1:5000")
-    app.run(debug=False)
+    webbrowser.open("http://"+host+':'+str(port))
+    app.run(host=host,port=port,debug=False)
 
