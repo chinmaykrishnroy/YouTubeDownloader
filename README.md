@@ -23,8 +23,9 @@ For Other Machines:
 On Android, use PyDroid 3 and download the packages mentioned in the requirements.txt using pip. 
 
 ### Android Installation Process:
-Download [Pydroid 3](https://play.google.com/store/apps/details?id=ru.iiec.pydroid3&pli=1) from the Google Play store and give all the necessary permissions and follow the below steps:<be>
+Download [Pydroid 3](https://play.google.com/store/apps/details?id=ru.iiec.pydroid3&pli=1) from the Google Play store and allow all the necessary permissions and follow the below steps:<be>
 ![mobile_installation](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/6b5560d6-d728-4645-9688-9d32b675d6dc)
+And after that, every time you just have to click on the run button to launch the app. 
 
 ## v1.0
 The command line is quite simple and self-explanatory:
