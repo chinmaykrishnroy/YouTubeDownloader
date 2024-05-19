@@ -38,7 +38,7 @@
             /* Height is set to 0 to start with */
             padding-bottom: 45%;
             /* 16:9 aspect ratio, calculated as (9 / 16) * 80% */
-            background: linear-gradient(to right, #1F1B41, #191634);
+            background: linear-gradient(to right, #1F1B41, #0c0a1d);
             position: absolute;
             top: 50%;
             left: 50%;
@@ -82,7 +82,7 @@
             height: 43.25%;
             position: absolute;
             font-family: 'Segoe UI', sans-serif;
-            font-size: 24px;
+            font-size: 2vw;
             color: white;
             background-color: rgb(12, 11, 41);
             border: 0px;
@@ -95,7 +95,7 @@
             margin: 19% 2% 0% 0%;
             position: absolute;
             font-family: 'Segoe UI', sans-serif;
-            font-size: 24px;
+            font-size: 2vw;
             color: white;
             background-color: #473beb;
             border: 0px;
@@ -171,7 +171,6 @@
         }
 
         #resultspace {
-            overflow-y: auto;
             overflow-x: hidden;
             width: 52%;
             /* 10% of the rectangle's width */
@@ -202,43 +201,53 @@
         .thumbnail-button {
             border-right: 1px solid #cccccc;
             cursor: pointer;
-            width: 120px;
-            height: 68px;
+            width: 142px;
+            height: 80px;
             margin-right: 3%;
             border: 0px;
-            border-radius: 0.75vw;
+            border-radius: 0.5vw;
         }
 
         .video-info {
-            text-wrap: nowrap;
-            text-overflow: ellipsis;
             flex-grow: 1;
             display: flex;
             flex-direction: column;
             justify-content: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: calc(100% - 150px);
         }
 
         .video-title {
-            overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            font-size: 20px;
-            color: #e6e9d9;
+            font-size: 1.25vw;
+            color: #ffffff;
             margin-bottom: 3%;
             border-bottom: 1px solid #3cdf2d;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: calc(100% - 80px);
         }
 
         .video-description {
             font-family: 'Segoe UI', sans-serif;
-            font-size: 14px;
+            font-size: .75vw;
+            color: #ffffff;
             font-weight: lighter;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: calc(100% - 80px);
             /* padding-top: 5px; */
         }
 
         .audioButton {
             display: inline-block;
-            width: 18%;
+            width: 9%;
             /* 50% of the sidebar's width */
-            height: 50%;
+            height: 92%;
             /* Adjust the height as needed */
             background: #a5a9d4;
             /* Sidebar color */
@@ -248,8 +257,10 @@
             align-items: flex-start;
             position: absolute;
             bottom: 4%;
-            right: 1%;
+            top: 4%;
+            right: 0.5%;
             transition: background-color 0.2s ease;
+            text-decoration: none;
             /* Smooth border color transition */
         }
 
@@ -259,11 +270,13 @@
         }
 
         .audioButtonTxt {
-            font-family: 'Segoe UI', sans-serif;
-            margin-top: 5%;
-            font-size: 14px;
+            font-family: "Montserrat", sans-serif;
+            font-weight: bolder;
+            margin-top: 1.75rem;
+            color: black;
+            font-size: .9vw;
             text-align: center;
-            vertical-align: middle;
+            text-decoration: none;
         }
 
         .medias {
@@ -284,7 +297,7 @@
         .media-title {
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
-            font-size: 20px;
+            font-size: 1vw;
             color: #e6e9d9;
             text-align: left;
             margin-bottom: 2%;
@@ -328,7 +341,7 @@
 
         /* Icon styling */
         .button .icon {
-            font-size: 1em;
+            font-size: 1vw;
             color: white;
         }
 
@@ -355,7 +368,7 @@
             margin: 2% 0 1% 9%;
             position: absolute;
             font-family: 'Segoe UI', sans-serif;
-            font-size: 30px;
+            font-size: 2.25vw;
             color: #ff0000;
             /* Neon text color */
         }
@@ -544,15 +557,9 @@
         <div id="sidebar">
             <div id="button" onclick="toggleMenu()">☰
             </div>
-            <div class="sidebar-button">
-                <span class="icon">M</span>
-            </div>
-            <div class="sidebar-button">
-                <span class="icon">H</span>
-            </div>
-            <div class="sidebar-button">
-                <span class="icon">S</span>
-            </div>
+            <ul>
+
+            </ul>
             <label class="switch">
                 <input type="checkbox" name="a_v">
                 <div class="slider slider--0">VIDEO</div>
