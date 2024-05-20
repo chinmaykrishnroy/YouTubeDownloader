@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+   <!--=============== REMIXICONS ===============-->
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.2.0/remixicon.min.css">
+
+   <!--=============== CSS ===============-->
+   <style>
+      /*=============== GOOGLE FONTS ===============*/
+      @import url("https://fonts.googleapis.com/css2?family=Montserrat+Alternates:wght@400;500&display=swap");
+
+      /*=============== VARIABLES CSS ===============*/
+      :root {
+         --header-height: 3.5rem;
+
+         /*========== Colors ==========*/
+         /*Color mode HSL(hue, saturation, lightness)*/
+         --white-color: hsl(0, 0%, 100%);
+         --black-color: hsl(0, 0%, 0%);
+
+         /*========== Font and typography ==========*/
+         /*.5rem = 8px | 1rem = 16px ...*/
+         --body-font: "Montserrat", sans-serif;
+         --h1-font-size: 1.5rem;
+         --normal-font-size: .938rem;
+
+         /*========== Font weight ==========*/
+         --font-regular: 400;
+         --font-medium: 500;
+
+         /*========== z index ==========*/
+         --z-tooltip: 10;
+         --z-fixed: 100;
+      }
+
+      /*========== Responsive typography ==========*/
+      @media screen and (min-width: 1150px) {
+         :root {
+            --normal-font-size: 1rem;
+         }
+      }
+
+      /*=============== BASE ===============*/
+      * {
+         box-sizing: border-box;
+         padding: 0;
+         margin: 0;
+      }
+
+      html {
+         scroll-behavior: smooth;
+      }
+
+      body {
+         font-family: var(--body-font);
+         font-size: var(--normal-font-size);
+         background-color: var(--white-color);
+      }
+
+      ul {
+         list-style: none;
+      }
+
+      a {
+         text-decoration: none;
+      }
+
+      ::-webkit-scrollbar {
+         width: 3px;
+         /* Set the width of the scrollbar */
+      }
+
+      ::-webkit-scrollbar-track {
+         background-color: #000000;
+         /* Set the track color */
+      }
+
+      /* Customize the scrollbar thumb (handle) */
+      ::-webkit-scrollbar-thumb {
+         background-color: #ff0000;
+         /* Set the thumb color */
+         border-radius: 2vw;
+         /* Add rounded corners */
+      }
+
+      /*=============== REUSABLE CSS CLASSES ===============*/
+      .container {
+         max-width: 1120px;
+         margin-inline: 1.5rem;
+      }
+
+      /*=============== HEADER & NAV ===============*/
+      .header {
+         position: fixed;
+         width: 100%;
+         top: 0;
+         left: 0;
+         background-color: var(--black-color);
+         z-index: var(--z-fixed);
+      }
+
+      .nav {
+         position: relative;
+         height: var(--header-height);
+         display: flex;
+         justify-content: space-between;
+         align-items: center;
+      }
+
+      .nav__logo {
+         font-size: var(--h1-font-size);
+         color: var(--white-color);
+         font-weight: bold;
+      }
+
+      .nav__close,
+      .nav__toggle {
+         display: flex;
+         color: var(--white-color);
+         font-size: 1.5rem;
+         cursor: pointer;
+      }
+
+      /*=============== SEARCHBAR ===============*/
+      #searchBar form {
+         display: flex;
+         justify-content: center;
+      }
+
+      #searchBar input {
+         font-family: var(--body-font);
+         font-size: var(--normal-font-size);
+         background-color: var(--white-color);
+         border-radius: .2rem;
+         border: none;
+         padding: 0.75rem;
+         min-width: 150px;
+         width: 8vw;
+      }
+
+      #searchBar button {
+         font-family: var(--body-font);
+         font-size: var(--normal-font-size);
+         background-color: var(--white-color);
+         border-radius: .2rem;
+         margin-left: 0.2rem;
+         background-color: #ff0000;
+         color: white;
+         padding: 0.75rem;
+         border: none;
+         cursor: pointer;
+      }
+
+      #searchBar button:hover {
+         background-color: #666;
+      }
+
+      /* Navigation for mobile devices */
+      @media screen and (max-width: 1150px) {
+         .nav__menu {
+            position: fixed;
+            left: -100%;
+            top: 0;
+            background-color: var(--black-color);
+            width: 100%;
+            height: 100%;
+            padding: 6rem 1.75rem 1.75rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: left .4s;
+         }
+
+         .nav__item {
+            transform: translateX(-150px);
+            visibility: hidden;
+            transition: transform .2s ease-out, visibility .2s;
+         }
+
+         .nav__item:nth-child(1) {
+            transition-delay: .05s;
+         }
+
+         .nav__item:nth-child(2) {
+            transition-delay: .1s;
+         }
+
+         .nav__item:nth-child(3) {
+            transition-delay: .15s;
+         }
+
+         .nav__item:nth-child(4) {
+            transition-delay: .2s;
+         }
+
+         .nav__item:nth-child(5) {
+            transition-delay: .25s;
+         }
+      }
+
+      .nav__list,
+      .nav__social {
+         display: flex;
+      }
+
+      .nav__list {
+         flex-direction: column;
+         row-gap: 2rem;
+      }
+
+      .nav__link {
+         position: relative;
+         color: var(--white-color);
+         font-size: var(--h1-font-size);
+         font-weight: var(--font-medium);
+         display: inline-flex;
+         align-items: center;
+         transition: opacity .2s;
+      }
+
+      .nav__link i {
+         font-size: 2rem;
+         position: absolute;
+         opacity: 0;
+         visibility: hidden;
+         transition: opacity .2s, visibility .4s;
+      }
+
+      .nav__link span {
+         position: relative;
+         transition: margin .2s;
+      }
+
+      .nav__link span::after {
+         content: "";
+         position: absolute;
+         left: 0;
+         bottom: -6px;
+         width: 0;
+         height: 2px;
+         background-color: var(--white-color);
+         transition: width .2s ease-out;
+      }
+
+      /* Animation link on hover */
+      .nav__link:hover span {
+         margin-left: 2.5rem;
+      }
+
+      .nav__link:hover i {
+         opacity: 1;
+         visibility: visible;
+      }
+
+      .nav__link:hover span::after {
+         width: 100%;
+      }
+
+      /* Sibling fade animation */
+      .nav__list:has(.nav__link:hover) .nav__link:not(:hover) {
+         opacity: .2;
+      }
+
+      .nav__close {
+         position: absolute;
+         top: 1rem;
+         right: 1.5rem;
+         right: 52.75vw;
+      }
+
+      .nav__social {
+         column-gap: 1rem;
+      }
+
+      .nav__social-link {
+         color: var(--white-color);
+         font-size: 1.5rem;
+         transition: transform .4s;
+      }
+
+      .nav__social-link:hover {
+         transform: translateY(-.25rem);
+      }
+
+      /* Show menu */
+      .show-menu {
+         left: 50%;
+      }
+
+      /* Animation link when displaying menu */
+      .show-menu .nav__item {
+         visibility: visible;
+         transform: translateX(0);
+      }
+
+      /*=============== VIDEO CONTAINERS ===============*/
+      .video-container {
+         margin-top: 5rem;
+         display: grid;
+         gap: 10px;
+         padding: 10px;
+         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      }
+
+      .video {
+         margin-top: 3.5rem;
+         background-color: rgba(0, 0, 0, 0.075);
+         border: 1px solid rgba(0, 0, 0, 0.15);
+         border-radius: 5px;
+         overflow: hidden;
+         display: flex;
+         flex-direction: column;
+      }
+
+      .thumbnail {
+         width: 100%;
+         aspect-ratio: 16 / 9;
+         object-fit: cover;
+      }
+
+      .video-details {
+         display: flex;
+         padding: 10px;
+      }
+
+      .channel-icon {
+         top: 50%;
+         width: 32px;
+         height: 32px;
+         border-radius: 50%;
+         flex-shrink: 0;
+      }
+
+      .video-info {
+         margin-left: 10px;
+         display: flex;
+         flex-direction: column;
+         justify-content: center;
+         max-width: calc(100% - 50px)
+      }
+
+      .video-title {
+         margin: 0;
+         font-size: 16px;
+         font-weight: bold;
+         line-height: 1.2;
+         white-space: nowrap;
+         overflow: hidden;
+         text-overflow: ellipsis;
+      }
+
+      .channel-name,
+      .views,
+      .dot {
+         margin: 2px 0;
+         font-size: 14px;
+         color: #666;
+         white-space: nowrap;
+         overflow: hidden;
+         text-overflow: ellipsis;
+      }
+
+      /* Navigation for mobile devices */
+      @media screen and (max-width: 1150px) {
+         .video-container {
+            grid-template-columns: 1fr;
+            margin-top: 3.5rem;
+         }
+
+         .video {
+            margin-top: 0rem;
+         }
+
+         /* Webkit (Safari/Chrome) */
+         ::-webkit-scrollbar {
+            display: none;
+         }
+
+         /* Firefox */
+         scrollbar-width: none;
+
+         /* IE 10+ */
+         -ms-overflow-style: none;
+      }
+
+      /* For large devices */
+      @media screen and (min-width: 1150px) {
+         .container {
+            margin-inline: auto;
+         }
+
+         .nav {
+            height: calc(var(--header-height) + 2rem);
+         }
+
+         .nav__toggle,
+         .nav__close {
+            display: none;
+         }
+
+         .nav__link {
+            font-size: var(--normal-font-size);
+         }
+
+         .nav__link i {
+            font-size: 1.5rem;
+         }
+
+         .nav__list {
+            flex-direction: row;
+            column-gap: 3.5rem;
+         }
+
+         .nav__menu {
+            display: flex;
+            align-items: center;
+            column-gap: 3.5rem;
+         }
+
+         .video-container {
+            flex-direction: row;
+            flex-wrap: wrap;
+         }
+
+         .video {
+            flex: 1 1 calc(20% - 20px);
+            /* 20% width for 5 videos per row with some margin */
+            margin: 10px;
+         }
+
+         .video-details {
+            flex-direction: row;
+         }
+
+         .channel-icon {
+            width: 40px;
+            height: 40px;
+         }
+
+         .video-title {
+            font-size: 18px;
+         }
+
+         .channel-name,
+         .views,
+         .dot {
+            font-size: 16px;
+         }
+      }
+   </style>
+
+   <title>Responsive navbar</title>
+</head>
+
+<body>
+   <!--==================== HEADER ====================-->
+   <header class="header" id="header">
+      <nav class="nav container">
+         <a href="https://youtube.com" class="nav__logo">YouTube</a>
+         <div id="searchBar">
+            <form action="/search" method="POST">
+               <input type="text" id="searchText" name="q" placeholder="Type Anything">
+               <button type="submit">Search</button>
+            </form>
+         </div>
+         <div class="nav__menu" id="nav-menu">
+            <ul class="nav__list">
+               <li class="nav__item">
+                  <a href="#" class="nav__link">
+                     <i class="ri-arrow-right-up-line"></i>
+                     <span>Home</span>
+                  </a>
+               </li>
+
+               <li class="nav__item">
+                  <a href="#" class="nav__link">
+                     <i class="ri-arrow-right-up-line"></i>
+                     <span>About Us</span>
+                  </a>
+               </li>
+
+               <li class="nav__item">
+                  <a href="#" class="nav__link">
+                     <i class="ri-arrow-right-up-line"></i>
+                     <span>Projects</span>
+                  </a>
+               </li>
+
+               <li class="nav__item">
+                  <a href="#" class="nav__link">
+                     <i class="ri-arrow-right-up-line"></i>
+                     <span>Studio</span>
+                  </a>
+               </li>
+
+               <li class="nav__item">
+                  <a href="#" class="nav__link">
+                     <i class="ri-arrow-right-up-line"></i>
+                     <span>Contact</span>
+                  </a>
+               </li>
+            </ul>
+
+            <!-- Close button -->
+            <div class="nav__close" id="nav-close">
+               <i class="ri-close-large-line"></i>
+            </div>
+
+            <div class="nav__social">
+               <a href="https://www.linkedin.com/in/chinmaykrishnroy" target="_blank" class="nav__social-link">
+                  <i class="ri-linkedin-box-line"></i>
+               </a>
+
+               <a href="https://github.com/chinmaykrishnroy" target="_blank" class="nav__social-link">
+                  <i class="ri-github-line"></i>
+               </a>
+
+               <a href="https://www.instagram.com/chinmaykrishn/" target="_blank" class="nav__social-link">
+                  <i class="ri-instagram-line"></i>
+               </a>
+
+               <a href="https://twitter.com/chinmaykrishnroy" target="_blank" class="nav__social-link">
+                  <i class="ri-twitter-line"></i>
+               </a>
+            </div>
+         </div>
+
+         <!-- Toggle button -->
+         <div class="nav__toggle" id="nav-toggle">
+            <i class="ri-menu-line"></i>
+         </div>
+      </nav>
+   </header>
+
+   <!--==================== MAIN ====================-->
+   <main>
+      <div class="video-container">
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 1 kutgtffkugfkgfkgffkgjf</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">1M views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 2</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">500K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/ScMzIvxBSi4/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 3</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">300K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 4</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">800K views</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 5</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">900K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 1 kutgtffkugfkgfkgffkgjf</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">1M views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 2</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">500K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/ScMzIvxBSi4/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 3</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">300K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 4</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">800K views</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 5</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">900K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 1 kutgtffkugfkgfkgffkgjf</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">1M views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 2</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">500K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/ScMzIvxBSi4/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 3</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">300K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 4</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">800K views</p>
+               </div>
+            </div>
+         </div>
+         <div class="video">
+            <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Video Thumbnail" class="thumbnail">
+            <div class="video-details">
+               <img src="https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" alt="Channel Icon"
+                  class="channel-icon">
+               <div class="video-info">
+                  <h4 class="video-title">Video Title 5</h4>
+                  <p class="channel-name">Channel Name</p>
+                  <p class="views">900K views<span class="dot"> • </span>2 weeks ago</p>
+               </div>
+            </div>
+         </div>
+         <!-- Add more video divs as needed -->
+      </div>
+   </main>
+
+   <!--=============== MAIN JS ===============-->
+   <script>
+      /*=============== SHOW MENU ===============*/
+      const navMenu = document.getElementById('nav-menu'),
+         navToggle = document.getElementById('nav-toggle'),
+         navClose = document.getElementById('nav-close'),
+         inputField = document.getElementById('searchText');
+
+      /* Menu show */
+      if (navToggle) {
+         navToggle.addEventListener('click', () => {
+            navMenu.classList.add('show-menu')
+         })
+      };
+
+      /* Menu hidden */
+      if (navClose) {
+         navClose.addEventListener('click', () => {
+            navMenu.classList.remove('show-menu')
+         })
+      };
+
+      inputField.addEventListener('focus', event => {
+         navMenu.classList.remove('show-menu')
+      });
+   </script>
+</body>
+
+</html>
