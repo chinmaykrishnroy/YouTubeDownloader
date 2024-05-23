@@ -27,6 +27,8 @@ def topResults(videoName, mode=False, maxLimit=5):
         except Exception as e: print("\033[91mERROR!\033[0m\t\033[3m\033[0;37m%s\033[0m\033[0m"%e)
         return
     try:
+        global alert, display_alert, message
+        alert, display_alert, message = "", False, "Downloaded"
         from youtubesearchpython import VideosSearch
         videosSearch = VideosSearch(videoName, limit=maxLimit)
         results = videosSearch.result()["result"]
@@ -43,7 +45,6 @@ def topResults(videoName, mode=False, maxLimit=5):
             except: downloadMedia(selectedVideo["id"], selectedVideo["title"], mode)
         else: print("\033[91mNot a valid choice!\033[0m\033[0m")
     except Exception as e: 
-        global alert, display_alert, message
         alert, display_alert, message = "%s"%e, True, "Failed"
         print("\r\033[91mERROR!\033[0m\t\033[3m\033[0;37m%s\033[0m\033[0m"%e)
 
