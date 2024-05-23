@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
         self.sequential_animation.addAnimation(self.initial_message_animation)
         self.sequential_animation.start()
 
-        self.loading_text = QLabel("\n\n\n\nLoading\nResults...")
+        self.loading_text = QLabel("\n\n\nLoading\nResults...")
         self.loading_text.setStyleSheet("""
             color: black;
             font-size: 32px;
