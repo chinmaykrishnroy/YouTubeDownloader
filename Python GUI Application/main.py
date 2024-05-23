@@ -48,7 +48,6 @@ class MainWindow(QMainWindow):
 
         # Window properties
         self.setWindowTitle('YouTube Downloader')
-        self.setStyleSheet("border: none; padding: 0;")
         self.setGeometry(100, 100, 700, 510)
         self.setFixedSize(700, 510)
         self.setWindowFlags(Qt.FramelessWindowHint)
@@ -63,6 +62,9 @@ class MainWindow(QMainWindow):
 
         self.layout = QVBoxLayout()
         self.central_widget.setLayout(self.layout)
+        
+        # Set style sheet to remove border and padding
+        self.setStyleSheet("border: none; padding: 0;")
 
         # Header
         self.header = QWidget()
@@ -72,7 +74,7 @@ class MainWindow(QMainWindow):
         
         # Logo as a QPushButton
         self.logo_button = QPushButton('YouTube')
-        self.logo_button.setStyleSheet("font-family: 'Helvetica'; color: white; font-size: 24px; font-weight: bold;")
+        self.logo_button.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
         self.logo_button.clicked.connect(self.open_youtube)
         self.header_layout.addWidget(self.logo_button)
         
@@ -126,7 +128,6 @@ class MainWindow(QMainWindow):
         self.initial_message_label = QLabel("\n\n\nSearch Video With\nName to Generate\nResponses")
         self.initial_message_label.setStyleSheet("""
             color: black;
-            font: Montserrat;
             font-size: 32px;
             font-weight: bold;
             text-align: left;
@@ -168,7 +169,7 @@ class MainWindow(QMainWindow):
         """)
         self.downloading_text.setAlignment(Qt.AlignCenter)
 
-        self.downloaded_message = QLabel("\n\n\nDownloaded!", self)
+        self.downloaded_message = QLabel("\n\n\n\nDownloaded!", self)
         self.downloaded_message.setStyleSheet("""
             color: black;
             font-size: 32px;
@@ -210,7 +211,7 @@ class MainWindow(QMainWindow):
         self.show_initial_message(True)
 
     def search(self, query):
-        videos_search = VideosSearch(query, limit=40)
+        videos_search = VideosSearch(query, limit=20)
         self.hide_downloading_message()
         results = videos_search.result()
         self.videos = []
@@ -308,7 +309,9 @@ class MainWindow(QMainWindow):
         video_info.setLayout(video_info_layout)
         
         video_title = QLabel(video['title'])
-        video_title.setStyleSheet("font-weight: bold; font-size: 16px")
+        video_title.setStyleSheet("font-weight: bold;")
+        video_title = QLabel(video['title'])
+        video_title.setStyleSheet("font-weight: bold;")
         video_title.setAlignment(Qt.AlignLeft | Qt.AlignTop)  # Align text to top left
         video_title.setWordWrap(True)  # Enable word wrap
         font_metrics = QFontMetrics(video_title.font())
@@ -316,10 +319,8 @@ class MainWindow(QMainWindow):
         video_title.setText(elided_text)
         
         channel_name = QLabel(video['channel'])
-        channel_name.setStyleSheet("font-size: 16px")
         views_age = f"{video['views']} • {video['age']}"
         views_label = QLabel(views_age)
-        views_label.setStyleSheet("font-size: 16px")
         
         # Add video title, channel name, and views to the video_info_layout
         video_info_layout.addWidget(video_title)
@@ -437,8 +438,8 @@ class MainWindow(QMainWindow):
 
             # Show loading message
             self.loading(True)
-
             self.video_container.setVisible(False)
+
             self.worker_thread = WorkerThread(self, search_text)
             self.worker_thread.taskFinished.connect(self.seach_complete_handler)
 
