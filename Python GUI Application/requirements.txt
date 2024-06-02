@@ -1,0 +1,5 @@
+youtube-search-python
+pytube==15.0.0
+pyside6
+youtube_dl
+requests
