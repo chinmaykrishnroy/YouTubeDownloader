@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Results</title>
+    <style>
+        /* Same CSS styles as in index.html */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        #menu {
+            width: 45px;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            transition: width 0.3s;
+            background-color: #333;
+            color: white;
+            padding-top: 60px;
+            overflow: hidden;
+            z-index: 1000;
+        }
+
+        #menu.active {
+            width: 200px;
+        }
+
+        #menu button {
+            display: block;
+            background-color: #444;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        #menu button:hover {
+            background-color: #555;
+        }
+
+        #toggleMenu {
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 1001;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 10px;
+            background-color: #333;
+            color: white;
+        }
+
+        #main {
+            transition: margin-left 0.3s;
+            padding-top: 20px;
+            margin-left: 50px;
+        }
+
+        #main.active {
+            margin-left: 200px;
+        }
+
+        #searchBar form {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        #searchBar input {
+            width: 200px;
+            padding: 10px;
+        }
+
+        #searchBar button {
+            margin-left: 10px;
+            background-color: #555;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+        }
+
+        #searchBar button:hover {
+            background-color: #666;
+        }
+
+        #content {
+            height: calc(100vh - 60px);
+            overflow-y: scroll;
+            background-color: white;
+            padding: 20px;
+            transition: width 0.3s;
+        }
+
+        .item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        .thumbnail-button {
+            border-radius: 10px;
+            /* border-right: 1px solid #ccc; */
+            background-color: #160c4e;
+            cursor: pointer;
+            width: 320px;
+            height: 180px;
+            margin-right: 15px;
+        }
+
+        .video-info {
+            /* margin-left: 15px; */
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .video-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+        }
+
+        .video-description {
+            font-size: 16px;
+            padding-top: 5px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 15px;
+            margin: 5px;
+            background-color: #555;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        .btn:hover {
+            background-color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toggleMenu" onclick="toggleMenu()">☰</div>
+    <div id="menu">
+        <button onclick="toggleMenu()">Downloads</button>
+        <button onclick="toggleMenu()">History</button>
+        <button onclick="toggleMenu()">Help</button>
+        <button onclick="toggleMenu()">More</button>
+    </div>
+    <div id="main">
+        <div id="searchBar">
+            <form action="{{ url_for('search') }}" method="post">
+                <input type="text" name="query" placeholder="Search" required>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div id="content">
+            {% for video in videos %}
+            <div class="item">
+                <button class="thumbnail-button"
+                    onclick="window.location.href='{{ url_for('download', video_id=video['id'], format='video') }}'">
+                    <img src="{{ video['thumbnail'] }}" alt="Video Thumbnail" style="width: 100%; height: 100%;">
+                </button>
+                <div class="video-info">
+                    <div class="video-title">{{ video['title'] }}</div>
+                    <div class="video-description">{{ video['description'] }}</div>
+                    <div>
+                        <a href="{{ url_for('download', video_id=video['id'], format='video') }}" class="btn">Download
+                            Video</a>
+                        <a href="{{ url_for('download', video_id=video['id'], format='audio') }}" class="btn">Download
+                            Audio</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        window.onload = function () {
+            var menu = document.getElementById('menu');
+            var buttons = menu.getElementsByTagName('button');
+            for (var i = 0; i < buttons.length; i++) {
+                buttons[i].style.display = 'none'; // Hide the buttons
+            }
+        };
+
+        function toggleMenu() {
+            var menu = document.getElementById('menu');
+            var main = document.getElementById('main');
+            var toggleMenuButton = document.getElementById('toggleMenu');
+            var buttons = menu.querySelectorAll('button');
+
+            // Toggle the 'active' class on the menu and main content
+            menu.classList.toggle('active');
+            main.classList.toggle('active');
+
+            // Check if the menu is active or not
+            if (menu.classList.contains('active')) {
+                // Menu is active, show the buttons
+                buttons.forEach(function (button) {
+                    button.style.display = 'block';
+                });
+                toggleMenuButton.innerHTML = '☰ Menu';
+            } else {
+                // Menu is not active, hide the buttons
+                buttons.forEach(function (button) {
+                    button.style.display = 'none';
+                });
+                toggleMenuButton.innerHTML = '☰';
+            }
+        }
+    </script>
+</body>
+
+</html>
