@@ -49,9 +49,7 @@ Downloaded video:
 It is even simpler than v1.0 as there is UI hosted by Flask (default on 127.0.0.1:5000). After launching app.py or run.bat, use the browser to open the page hosted by Flask (default on 127.0.0.1:5000, so type this IP address in your browser). The UI should look something like this:
 ![Screenshot 2024-04-02 031418](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/36f29a28-cc8a-4b34-a714-70989059eba5)
 ![Screenshot 2024-04-02 031442](https://github.com/chinmaykrishnroy/YouTubeDownloader/assets/65699140/eab58881-b8cc-4f78-8b28-4e3fcad1797d)
-![image](https://github.com/user-attachments/assets/22e8bf70-dd8f-4f5f-a292-4c9836daca6e)
-
-
+![image](https://github.com/user-attachments/assets/b5f50f52-9f4c-483e-a0be-be752899e9b8)
 
 ### Note:
 Audios and videos will be saved in Downloads\YouTube Audio and Download\YouTube Video respectively on Windows machines.<br>
