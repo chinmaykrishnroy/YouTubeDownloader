@@ -22,7 +22,7 @@ def run_all_tests():
 
     # Discover and add test modules
     tests_dir = BASE_DIR / "tests"
-    discovered = loader.discover(start_dir=str(tests_dir), pattern="test_*.py")
+    discovered = loader.discover(start_dir=str(tests_dir), pattern="test_*.py", top_level_dir=str(BASE_DIR))
     suite.addTests(discovered)
 
     print("=" * 70)
