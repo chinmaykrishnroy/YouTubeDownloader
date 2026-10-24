@@ -9,7 +9,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml"><img src="https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline Status" /></a>
+    <a href="https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml"><img src="https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI Pipeline Status" /></a>
     <a href="https://github.com/chinmaykrishnroy/YouTubeDownloader/releases"><img src="https://img.shields.io/github/v/release/chinmaykrishnroy/YouTubeDownloader?color=blue&logo=github" alt="Latest Release" /></a>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white" alt="Python 3.11 | 3.12" /></a>
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white" alt="FastAPI" /></a>
