@@ -802,19 +802,11 @@ async def serve_file(job_id: str, background_tasks: BackgroundTasks):
     clean_title = sanitize_filename(job.get("title", "download"))[:180]  # cap length
     download_name = f"{clean_title}{ext}"
 
-    # RFC 5987 encoding for non-ASCII filenames (covers Unicode titles)
-    import urllib.parse
-    encoded_name = urllib.parse.quote(download_name, safe="")
-
+    # FileResponse encodes Unicode filenames for Content-Disposition (RFC 5987).
     return FileResponse(
         path=str(fp),
         media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": (
-                f"attachment; filename=\"{download_name}\"; "
-                f"filename*=UTF-8''{encoded_name}"
-            )
-        },
+        filename=download_name,
     )
 
 
