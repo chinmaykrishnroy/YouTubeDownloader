@@ -2,17 +2,17 @@
 setlocal enabledelayedexpansion
 title YouTube Downloader - Production Runner
 
-:: Navigate to project root directory
+REM Navigate to project root directory
 cd /d "%~dp0\.."
 set "PROJECT_DIR=%CD%"
 
 echo ==========================================================
-echo       YouTube Downloader - Production Setup & Runner
+echo       YouTube Downloader - Production Setup and Runner
 echo ==========================================================
 echo Project Directory: %PROJECT_DIR%
 echo.
 
-:: Check or auto-create .env from .env.example for first-time run
+REM Check or auto-create .env from .env.example for first-time run
 if not exist ".env" (
     if exist ".env.example" (
         echo [INFO] First-time setup: Creating .env from .env.example...
@@ -21,7 +21,7 @@ if not exist ".env" (
     )
 )
 
-:: 1. Check Python installation
+REM 1. Check Python installation
 where python >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     where py >nul 2>&1
@@ -39,24 +39,24 @@ if %ERRORLEVEL% NEQ 0 (
 for /f "tokens=*" %%i in ('%PY_CMD% --version 2^>^&1') do set "PY_VER=%%i"
 echo [OK] Detected %PY_VER%
 
-:: 2. Check or create virtual environment (.venv)
+REM 2. Check or create virtual environment
 if not exist ".venv\Scripts\activate.bat" (
-    echo [INFO] Creating virtual environment (.venv)...
+    echo [INFO] Creating virtual environment in .venv ...
     %PY_CMD% -m venv .venv
-    if %ERRORLEVEL% NEQ 0 (
+    if !ERRORLEVEL! NEQ 0 (
         echo [ERROR] Failed to create virtual environment!
         pause
         exit /b 1
     )
     echo [OK] Virtual environment created successfully.
 ) else (
-    echo [OK] Found existing virtual environment (.venv).
+    echo [OK] Found existing virtual environment in .venv.
 )
 
-:: 3. Activate virtual environment
+REM 3. Activate virtual environment
 call .venv\Scripts\activate.bat
 
-:: 4. Install / Update dependencies
+REM 4. Install or Update dependencies
 echo [INFO] Checking and installing dependencies from requirements.txt...
 python -m pip install --upgrade pip --quiet
 pip install -r requirements.txt --quiet
@@ -66,7 +66,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 echo [OK] Dependencies are up to date.
 
-:: 5. Check FFmpeg availability
+REM 5. Check FFmpeg availability
 where ffmpeg >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -75,16 +75,16 @@ if %ERRORLEVEL% NEQ 0 (
     echo 1080p video merging and MP3 conversion require FFmpeg.
     echo To install on Windows, run in PowerShell:
     echo     winget install Gyan.FFmpeg
-    echo (The app will still run and download 720p/360p video).
+    echo Note: The app will still run and download 720p or 360p video.
     echo ----------------------------------------------------------
     echo.
 ) else (
     echo [OK] FFmpeg is available on PATH.
 )
 
-:: 6. Run Pre-Flight Component Check (Dependencies, yt-dlp, Storage)
+REM 6. Run Pre-Flight Component Check
 echo.
-echo [INFO] Running pre-flight component checks (yt-dlp, dependencies, storage)...
+echo [INFO] Running pre-flight component checks for yt-dlp, dependencies, and storage...
 python scripts\preflight_check.py
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -97,7 +97,7 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-:: 7. Detect custom PORT from .env if present
+REM 7. Detect custom PORT from .env if present
 set "SERVER_PORT=8000"
 if exist ".env" (
     for /f "usebackq tokens=1,2 delims==" %%A in (".env") do (
@@ -113,10 +113,10 @@ if exist ".env" (
     )
 )
 
-:: 8. Launch browser after a brief delay in background
-start "" /B cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:!SERVER_PORT!"
+REM 8. Launch browser after a brief delay in background
+start "" /B cmd /c "ping 127.0.0.1 -n 3 >nul & start http://localhost:!SERVER_PORT!"
 
-:: 9. Start production server
+REM 9. Start production server
 echo.
 echo ==========================================================
 echo [INFO] Starting FastAPI server on http://localhost:!SERVER_PORT! ...
