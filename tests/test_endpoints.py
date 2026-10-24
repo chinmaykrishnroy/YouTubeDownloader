@@ -19,6 +19,7 @@ class TestEndpoints(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
+        cls.client.get("/session")
 
     def test_get_index_page(self):
         resp = self.client.get("/")
@@ -49,6 +50,7 @@ class TestEndpoints(unittest.TestCase):
     def test_jobs_list_and_lifecycle(self):
         test_id = "test_lifecycle_job_123"
         jobs[test_id] = {
+            "owner": self.client.cookies.get("yt_session"),
             "id": test_id,
             "title": "Mock Job Title",
             "status": "queued",
@@ -84,6 +86,7 @@ class TestEndpoints(unittest.TestCase):
         # Malicious job attempting to break out of downloads directory
         hacker_id = "test_exploit_job"
         jobs[hacker_id] = {
+            "owner": self.client.cookies.get("yt_session"),
             "id": hacker_id,
             "title": "Exploit",
             "status": "complete",
@@ -103,6 +106,7 @@ class TestEndpoints(unittest.TestCase):
         target_file.write_bytes(b"ID3\x03\x00\x00\x00mock audio stream")
 
         jobs[job_id] = {
+            "owner": self.client.cookies.get("yt_session"),
             "id": job_id,
             "title": "Alan Walker - Fade",
             "status": "complete",
@@ -129,6 +133,7 @@ class TestEndpoints(unittest.TestCase):
         payload = b"mock audio stream"
         target_file.write_bytes(payload)
         jobs[job_id] = {
+            "owner": self.client.cookies.get("yt_session"),
             "id": job_id,
             "status": "complete",
             "filename": filename,
@@ -136,7 +141,8 @@ class TestEndpoints(unittest.TestCase):
         try:
             for title in ("हिन्दी गाना", "日本語の曲", "Music 🎵", "Café", "song\r\n title"):
                 with self.subTest(title=title):
-                    jobs[job_id]["title"] = title
+                    target_file.write_bytes(payload)
+                    jobs[job_id] = {"id": job_id, "owner": self.client.cookies.get("yt_session"), "status": "complete", "filename": filename, "title": title}
                     resp = self.client.get(f"/files/{job_id}")
                     self.assertEqual(resp.status_code, 200)
                     self.assertEqual(resp.content, payload)

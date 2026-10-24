@@ -12,11 +12,6 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - RELOAD=false
-    volumes:
-      # Persistent/Shared downloads directory
-      - ./downloads:/app/downloads
-      # Optional: Mount cookies.txt if deploying to a cloud VPS to prevent YouTube bot challenges
-      # - ./cookies.txt:/app/cookies.txt:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/system-status"]
       interval: 30s

@@ -116,11 +116,11 @@ cp .env.example .env
 | :--- | :--- | :--- |
 | `HOST` | `0.0.0.0` | Binding network interface IP address |
 | `PORT` | `8000` | Application HTTP and WebSocket listening port |
-| `DOWNLOADS_DIR` | `downloads` | Local directory for temporary storage of downloads |
+| `DOWNLOADS_DIR_PATH` | OS temporary directory | Optional override for private temporary media storage |
 | `MAX_CONCURRENT_DOWNLOADS` | `3` | Maximum simultaneous active download tasks |
 | `MAX_DOWNLOADS_CACHE_MB` | `5000` | Disk quota in megabytes before oldest files are purged |
 | `DOWNLOAD_TTL_SECONDS` | `1800` | Time-to-live in seconds before completed files expire |
-| `SESSION_CLEANUP_DELAY_SECONDS`| `30` | Grace period after all client tabs close before auto-cleaning |
+| Session disconnect grace | 15 seconds | Allows refresh/reconnection before deleting that browser session |
 | `AUTO_OPEN_BROWSER` | `true` | Automatically open default browser on local startup |
 | `YTDLP_COOKIES_PATH` | *(none)* | Path to optional Netscape cookies file for YouTube authentication |
 | `YTDLP_COOKIES_FROM_BROWSER` | *(none)* | Optional browser name to extract cookies from (e.g. `chrome`, `firefox`) |
@@ -156,16 +156,21 @@ If a mandatory component is missing, startup halts immediately with an actionabl
 > The server uses defensive directory handling (`DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)`). It verifies folder existence at boot, recreates it immediately before any write operation, and safely guards cleanup passes against missing directories.
 
 ### Auto-Cleanup Policies:
-1. **Session Disconnect**: When all connected browser tabs disconnect, a background cleaner runs after a 30-second grace window to purge completed downloads.
-2. **TTL Expiration**: Completed downloads older than `DOWNLOAD_TTL_SECONDS` (default: 30 minutes) are automatically unlinked.
-3. **Storage Quota Manager**: If total cache size exceeds `MAX_DOWNLOADS_CACHE_MB`, the oldest files are evicted until disk usage is within bounds.
-4. **Stale Partial Cleanup**: Interrupted `.part` files are removed during startup and routine sweeps.
+1. **Private Sessions**: An opaque HttpOnly, SameSite cookie identifies each browser session. Queue listings, job operations, file delivery, and WebSocket events enforce ownership. Tabs in one browser share their queue; other browsers/devices cannot see it.
+2. **Session Disconnect**: After the last socket for a browser disconnects, its jobs and temporary files are removed after a 15-second reconnect grace period. Silent connections time out after 60 seconds; sessions without sockets expire after 90 seconds. Running yt-dlp workers stop at the next progress callback and remove any late output when they exit.
+3. **File Delivery**: Media remains available privately until the user chooses Save. Once the full response finishes, its job and temporary files are deleted. This confirms transfer to the browser, not whether the user retained the file. Interrupted transfers are also discarded; restart the download to retry. Partial/range downloads are unsupported.
+
+4. **TTL Expiration**: Completed downloads older than `CLEANUP_TTL_SECONDS` (default: 30 minutes) are automatically unlinked.
+5. **Storage Quota Manager**: If total cache size exceeds `MAX_DISK_STORAGE_BYTES`, the oldest files are evicted until disk usage is within bounds.
+6. **Stale Partial Cleanup**: Interrupted `.part` files are removed during startup and routine sweeps.
+
+The default cache is a process-specific OS temporary directory, and Docker no longer mounts the shared host downloads folder. Existing files in an old host downloads folder are not exposed or deleted by the new app. Run one application worker/replica: sessions and queues are in memory. A multi-replica deployment needs a shared ownership store and routed workers before scaling out.
 
 ---
 
 ## Testing and CI Pipeline
 
-The project includes a suite of **52 automated unit, integration, and end-to-end tests**:
+The project includes a suite of **63 automated unit, integration, and end-to-end tests**:
 
 ```bash
 # Run full test suite
@@ -194,7 +199,7 @@ git push origin v4.0.1
 | `POST` | `/search` | Query YouTube videos (`{"query": "...", "limit": 10}`) |
 | `GET` | `/formats/{video_id}`| Retrieve available video resolutions and audio streams |
 | `POST` | `/download` | Queue a download job (`url`, `format`, `quality`, `title`) |
-| `GET` | `/jobs` | List all active and completed download jobs |
+| `GET` | `/jobs` | List this browser session’s active and completed jobs |
 | `GET` | `/jobs/{job_id}` | Poll current status, progress percentage, speed, and ETA |
 | `DELETE` | `/jobs/{job_id}` | Cancel active download or immediately delete completed file |
 | `GET` | `/files/{job_id}` | Stream and download the completed media file to client |

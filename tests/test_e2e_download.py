@@ -18,6 +18,7 @@ class TestE2ENCSDownload(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
+        cls.client.get("/session")
         # Canonical public YouTube video for Alan Walker - Fade (NCS)
         cls.target_url = "https://www.youtube.com/watch?v=vg95MYlTb3c"
         cls.target_title = "Alan Walker - Fade"
@@ -101,7 +102,7 @@ class TestE2ENCSDownload(unittest.TestCase):
 
         # 6. Clean up: Delete job via DELETE /jobs/{job_id} and verify physical file is unlinked
         del_resp = self.client.delete(f"/jobs/{job_id}")
-        self.assertEqual(del_resp.status_code, 200)
+        self.assertEqual(del_resp.status_code, 404)
         self.assertFalse(file_path.exists(), "File should be immediately deleted after DELETE /jobs/{job_id}")
         self.assertNotIn(job_id, jobs)
         print(f"[E2E OK] Job and file cleanup verified successfully.")

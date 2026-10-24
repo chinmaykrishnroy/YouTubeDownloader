@@ -3,6 +3,9 @@ import logging
 import os
 import re
 import uuid
+import secrets
+import tempfile
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,7 +13,7 @@ from typing import Optional
 
 import aiofiles
 import yt_dlp
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
@@ -62,7 +65,7 @@ if _winget_links.exists() and str(_winget_links) not in os.environ.get("PATH", "
 
 STATIC_DIR = BASE_DIR / "static"
 _downloads_custom = os.environ.get("DOWNLOADS_DIR_PATH")
-DOWNLOADS_DIR = Path(_downloads_custom).resolve() if _downloads_custom else (BASE_DIR / "downloads")
+DOWNLOADS_DIR = Path(_downloads_custom).resolve() if _downloads_custom else Path(tempfile.mkdtemp(prefix="yt-downloader-"))
 DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -83,7 +86,66 @@ YTDLP_PROXY = os.environ.get("YTDLP_PROXY", "")
 jobs: dict[str, dict] = {}
 active_connections: set[WebSocket] = set()
 cleanup_task: Optional[asyncio.Task] = None
-session_cleanup_timer: Optional[asyncio.TimerHandle] = None
+SESSION_COOKIE = "yt_session"
+SESSION_DISCONNECT_GRACE_SECONDS = 15
+SESSION_IDLE_SECONDS = 90
+sessions: dict[str, dict] = {}
+connection_owners: dict[WebSocket, str] = {}
+worker_tasks: dict[str, asyncio.Task] = {}
+
+
+def public_job(job: dict) -> dict:
+    return {k: v for k, v in job.items() if k not in ("owner", "serving")}
+
+
+def owned_jobs(owner: str) -> list[dict]:
+    if not owner or owner not in sessions:
+        return []
+    return [public_job(j) for j in list(jobs.values()) if j.get("owner") == owner]
+
+
+def require_session(request: Request) -> str:
+    owner = request.cookies.get(SESSION_COOKIE)
+    if not owner or owner not in sessions:
+        raise HTTPException(401, "Session expired. Reload the page to start a private session.")
+    sessions[owner]["seen"] = time.monotonic()
+    return owner
+
+
+def require_job(job_id: str, owner: str) -> dict:
+    job = jobs.get(job_id)
+    if not job or job.get("owner") != owner:
+        raise HTTPException(404, "Job not found")
+    return job
+
+
+def remove_job_data(job_id: str):
+    jobs.pop(job_id, None)
+    # Includes partial media, fragments, and thumbnails. IDs are server-generated.
+    for fp in DOWNLOADS_DIR.glob(f"{job_id}.*"):
+        if fp.is_file():
+            try:
+                fp.unlink(missing_ok=True)
+            except OSError:
+                pass  # A running worker retries cleanup when it exits.
+
+
+async def expire_session(owner: str):
+    sessions.pop(owner, None)
+    for job_id, job in list(jobs.items()):
+        if job.get("owner") == owner:
+            remove_job_data(job_id)
+            # Running threads finish cooperatively; they also clean in finally.
+
+
+class PrivateFileResponse(FileResponse):
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            remove_job_data(self.job_id)
+            await broadcast({"type": "removed", "job_id": self.job_id}, owner=self.owner)
+
 
 
 # ---------------------------------------------------------------------------
@@ -204,10 +266,14 @@ async def schedule_file_cleanup(job_id: str, delay_seconds: int = FILE_POST_DOWN
 
 
 async def periodic_cleanup_loop():
-    """Background garbage collection loop running every 2 minutes."""
+    """Expire disconnected sessions and collect stale media."""
     while True:
         try:
-            await asyncio.sleep(120)
+            await asyncio.sleep(5)
+            now = time.monotonic()
+            for owner, session in list(sessions.items()):
+                if owner not in connection_owners.values() and now - session["seen"] > SESSION_IDLE_SECONDS:
+                    await expire_session(owner)
             clean_stale_files(max_age_seconds=CLEANUP_TTL_SECONDS)
         except asyncio.CancelledError:
             break
@@ -227,6 +293,8 @@ async def lifespan(app_instance: FastAPI):
     yield
     if cleanup_task and not cleanup_task.done():
         cleanup_task.cancel()
+    for owner in list(sessions):
+        await expire_session(owner)
     # Clean partial/interrupted files on shutdown
     for pattern in ("*.part", "*.ytdl", "*.tmp", "*.temp"):
         for fp in DOWNLOADS_DIR.glob(pattern):
@@ -253,6 +321,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def private_session_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    expected_origin = f"{request.url.scheme}://{request.url.netloc}"
+    if origin and origin != expected_origin and (request.method not in ("GET", "HEAD") or request.url.path.startswith("/files/")):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": "Cross-origin request denied"}, status_code=403)
+    response = await call_next(request)
+    if request.url.path in ("/", "/downloads-page", "/session"):
+        owner = request.cookies.get(SESSION_COOKIE)
+        if owner not in sessions:
+            owner = secrets.token_urlsafe(32)
+            sessions[owner] = {"seen": time.monotonic()}
+            response.set_cookie(SESSION_COOKIE, owner, httponly=True, secure=request.url.scheme == "https", samesite="strict")
+    if request.url.path in ("/", "/downloads-page", "/session", "/jobs", "/system-status") or request.url.path.startswith(("/jobs/", "/files/")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/session")
+async def bootstrap_session():
+    return {"ok": True}
+
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -335,9 +427,16 @@ def format_duration(secs: Optional[int]) -> str:
 # ---------------------------------------------------------------------------
 # WebSocket broadcasting
 # ---------------------------------------------------------------------------
-async def broadcast(message: dict):
+async def broadcast(message: dict, owner: Optional[str] = None):
+    if owner is None:
+        job = jobs.get(message.get("job_id")) or message.get("job", {})
+        owner = job.get("owner")
+    if owner is None:
+        return
     dead: set[WebSocket] = set()
     for ws in list(active_connections):
+        if connection_owners.get(ws) != owner:
+            continue
         try:
             await ws.send_json(message)
         except Exception:
@@ -521,6 +620,8 @@ def embed_metadata(filepath: Path, info: dict, thumbnail_url: str = ""):
 
 def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop: asyncio.AbstractEventLoop):
     """Blocking download – runs in a thread pool."""
+    if job_id not in jobs:
+        return
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     has_ffmpeg = check_ffmpeg()
     safe_title = sanitize_filename(title) if title else "%(title)s"
@@ -530,6 +631,8 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
     ydl_extra = get_ydl_format(fmt, quality, has_ffmpeg)
 
     def progress_hook(d: dict):
+        if job_id not in jobs:
+            raise yt_dlp.utils.DownloadCancelled("Session closed")
         if d["status"] == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             downloaded = d.get("downloaded_bytes", 0)
@@ -589,6 +692,8 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            if job_id not in jobs:
+                return
             # Find the actual output file — after post-processing the extension may differ
             filename = None
             if info:
@@ -628,6 +733,8 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
                     except Exception:
                         pass
 
+            if job_id not in jobs:
+                return
             jobs[job_id].update(
                 {
                     "status": "complete",
@@ -644,11 +751,17 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
             )
     except Exception as exc:
         error_msg = str(exc)
+        if job_id not in jobs:
+            return
         jobs[job_id].update({"status": "error", "error": error_msg})
         asyncio.run_coroutine_threadsafe(
             broadcast({"type": "error", "job_id": job_id, "error": error_msg}),
             loop,
         )
+
+    finally:
+        if job_id not in jobs:
+            remove_job_data(job_id)
 
 
 # ---------------------------------------------------------------------------
@@ -668,7 +781,7 @@ FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 70">
 
 
 @app.get("/system-status")
-async def system_status():
+async def system_status(request: Request):
     """Check system environment (ffmpeg availability, platform install guide)."""
     import platform
     has_ff = check_ffmpeg()
@@ -688,7 +801,7 @@ async def system_status():
         "platform": os_name,
         "install_cmd": cmd,
         "guide": guide,
-        "active_jobs": len(jobs),
+        "active_jobs": len(owned_jobs(request.cookies.get(SESSION_COOKIE))),
     }
 
 
@@ -726,7 +839,7 @@ async def search_endpoint(req: SearchRequest):
 
 
 @app.post("/download")
-async def start_download(req: DownloadRequest):
+async def start_download(req: DownloadRequest, owner: str = Depends(require_session)):
     if not is_valid_youtube_url(req.url):
         raise HTTPException(
             status_code=400,
@@ -735,6 +848,7 @@ async def start_download(req: DownloadRequest):
     job_id = str(uuid.uuid4())
     job = {
         "id": job_id,
+        "owner": owner,
         "url": req.url,
         "title": req.title or req.url,
         "thumbnail": req.thumbnail,
@@ -752,7 +866,7 @@ async def start_download(req: DownloadRequest):
     jobs[job_id] = job
 
     # Broadcast new job immediately to all active WebSocket connections
-    await broadcast({"type": "new_job", "job": job})
+    await broadcast({"type": "new_job", "job": public_job(job)}, owner=owner)
 
     loop = asyncio.get_running_loop()
 
@@ -772,45 +886,38 @@ async def start_download(req: DownloadRequest):
                 loop,
             )
 
-    loop.create_task(_managed_worker())
+    task = loop.create_task(_managed_worker())
+    worker_tasks[job_id] = task
+    task.add_done_callback(lambda _: worker_tasks.pop(job_id, None))
 
-    return {"job_id": job_id, "job": job}
+    return {"job_id": job_id, "job": public_job(job)}
 
 
 @app.get("/jobs")
-async def list_jobs():
-    return {"jobs": list(jobs.values())}
+async def list_jobs(owner: str = Depends(require_session)):
+    return {"jobs": owned_jobs(owner)}
 
 
 @app.get("/jobs/{job_id}")
-async def get_job(job_id: str):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return jobs[job_id]
+async def get_job(job_id: str, owner: str = Depends(require_session)):
+    return public_job(require_job(job_id, owner))
 
 
 @app.delete("/jobs/{job_id}")
-async def delete_job(job_id: str):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs.pop(job_id)
-    # Immediately delete the physical file if it exists
-    if job.get("filename"):
-        fp = DOWNLOADS_DIR / job["filename"]
-        if fp.exists():
-            try:
-                fp.unlink(missing_ok=True)
-                logger.info(f"[Manual Delete] Removed file: {fp.name}")
-            except Exception:
-                pass
+async def delete_job(job_id: str, owner: str = Depends(require_session)):
+    require_job(job_id, owner)
+    remove_job_data(job_id)
+    await broadcast({"type": "removed", "job_id": job_id}, owner=owner)
     return {"ok": True}
 
 
 @app.get("/files/{job_id}")
-async def serve_file(job_id: str, background_tasks: BackgroundTasks):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
+async def serve_file(job_id: str, request: Request, owner: str = Depends(require_session)):
+    job = require_job(job_id, owner)
+    if "range" in request.headers:
+        raise HTTPException(400, "Partial downloads are not supported; download the complete file")
+    if job.get("serving"):
+        raise HTTPException(409, "File delivery already in progress")
     if job["status"] != "complete" or not job.get("filename"):
         raise HTTPException(status_code=400, detail="File not ready")
 
@@ -825,26 +932,21 @@ async def serve_file(job_id: str, background_tasks: BackgroundTasks):
     if not fp.exists():
         raise HTTPException(status_code=404, detail="File has already been cleaned or removed")
 
-    # Track download metrics & schedule auto-cleanup after file is saved by user
-    job["download_count"] = job.get("download_count", 0) + 1
-    job["last_downloaded_at"] = datetime.now(timezone.utc).isoformat()
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(schedule_file_cleanup(job_id, delay_seconds=FILE_POST_DOWNLOAD_CLEANUP_SECONDS))
-    except RuntimeError:
-        background_tasks.add_task(schedule_file_cleanup, job_id, delay_seconds=FILE_POST_DOWNLOAD_CLEANUP_SECONDS)
-
     # Build a clean, human-readable download filename (no UUID)
     ext = Path(job["filename"]).suffix          # e.g. ".mp3" or ".mp4"
     clean_title = sanitize_filename(job.get("title", "download"))[:180]  # cap length
     download_name = f"{clean_title}{ext}"
 
     # FileResponse encodes Unicode filenames for Content-Disposition (RFC 5987).
-    return FileResponse(
+    job["serving"] = True
+    response = PrivateFileResponse(
         path=str(fp),
         media_type="application/octet-stream",
         filename=download_name,
     )
+    response.job_id = job_id
+    response.owner = owner
+    return response
 
 
 @app.get("/formats/{video_id}")
@@ -875,32 +977,40 @@ async def get_formats(video_id: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-async def _delayed_session_cleanup():
-    """Triggered when client sessions disconnect. Waits 45s; if still 0 connections, auto-cleans completed files."""
-    await asyncio.sleep(45)
-    if len(active_connections) == 0:
-        logger.info("[Session Clean] All client sessions closed. Running auto-clean on completed files...")
-        clean_stale_files(max_age_seconds=60)
+async def _delayed_session_cleanup(owner: str):
+    await asyncio.sleep(SESSION_DISCONNECT_GRACE_SECONDS)
+    if owner not in connection_owners.values():
+        await expire_session(owner)
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    owner = websocket.cookies.get(SESSION_COOKIE)
+    origin = websocket.headers.get("origin")
+    expected_origin = f"{'https' if websocket.url.scheme == 'wss' else 'http'}://{websocket.url.netloc}"
+    if owner not in sessions or (origin and origin != expected_origin):
+        await websocket.close(code=1008)
+        return
+    previous_cleanup = sessions[owner].pop("disconnect_task", None)
+    if previous_cleanup:
+        previous_cleanup.cancel()
     await websocket.accept()
     active_connections.add(websocket)
-    logger.info(f"WebSocket client connected. Active sessions: {len(active_connections)}")
-    # Send current jobs snapshot on connect
+    connection_owners[websocket] = owner
     try:
-        await websocket.send_json({"type": "snapshot", "jobs": list(jobs.values())})
+        await websocket.send_json({"type": "snapshot", "jobs": owned_jobs(owner)})
         while True:
-            # Keep alive – wait for client ping or disconnect
-            data = await websocket.receive_text()
+            await asyncio.wait_for(websocket.receive_text(), timeout=60)
+            sessions[owner]["seen"] = time.monotonic()
     except (WebSocketDisconnect, Exception):
         pass
     finally:
         active_connections.discard(websocket)
-        logger.info(f"WebSocket client disconnected. Active sessions: {len(active_connections)}")
-        if len(active_connections) == 0:
-            asyncio.create_task(_delayed_session_cleanup())
+        connection_owners.pop(websocket, None)
+        if owner in sessions:
+            sessions[owner]["seen"] = time.monotonic()
+        if owner in sessions and owner not in connection_owners.values():
+            sessions[owner]["disconnect_task"] = asyncio.create_task(_delayed_session_cleanup(owner))
 
 
 # ---------------------------------------------------------------------------

@@ -100,15 +100,18 @@ class TestExtendedCoverage(unittest.TestCase):
 
             active_connections.add(mock_dead_ws)
             active_connections.add(mock_alive_ws)
+            main.connection_owners[mock_dead_ws] = "test-owner"
+            main.connection_owners[mock_alive_ws] = "test-owner"
 
             try:
-                await broadcast({"test": "data"})
+                await broadcast({"test": "data"}, owner="test-owner")
                 # Dead websocket should be pruned from set
                 self.assertNotIn(mock_dead_ws, active_connections)
                 self.assertIn(mock_alive_ws, active_connections)
             finally:
                 active_connections.discard(mock_dead_ws)
                 active_connections.discard(mock_alive_ws)
+                main.connection_owners.clear()
 
         asyncio.run(run_async())
 
@@ -174,7 +177,7 @@ class TestExtendedCoverage(unittest.TestCase):
             active_connections.clear()
             # Fast test: patch sleep to return immediately
             with patch("asyncio.sleep", return_value=None):
-                await _delayed_session_cleanup()
+                await _delayed_session_cleanup("test-owner")
 
         asyncio.run(run_async())
 

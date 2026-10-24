@@ -1826,6 +1826,7 @@ async function fetchJobs() {
     const res = await fetch('/jobs');
     if (!res.ok) return;
     const data = await res.json();
+    Object.keys(jobsState).forEach(id => delete jobsState[id]);
     (data.jobs || []).forEach(j => { jobsState[j.id] = j; });
     updateDlBadges();
     if (currentView === 'downloads') renderDownloads();
@@ -1835,7 +1836,8 @@ async function fetchJobs() {
 }
 
 /* ── WebSocket Setup for Live Progress ── */
-function connectWebSocket() {
+async function connectWebSocket() {
+  await fetch('/session', {cache: 'no-store'});
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${window.location.host}/ws`);
 
@@ -1848,7 +1850,12 @@ function connectWebSocket() {
   ws.addEventListener('message', (e) => {
     try {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'snapshot') {
+      if (msg.type === 'removed') {
+        delete jobsState[msg.job_id];
+        renderDownloads();
+        updateDlBadges();
+      } else if (msg.type === 'snapshot') {
+        Object.keys(jobsState).forEach(id => delete jobsState[id]);
         (msg.jobs || []).forEach(j => { jobsState[j.id] = j; });
         updateDlBadges();
         if (currentView === 'downloads') renderDownloads();

@@ -133,7 +133,8 @@
   let wsPingInterval = null;
 
   // ── WebSocket ────────────────────────────────────────────
-  function connect() {
+  async function connect() {
+    await fetch('/session', {cache: 'no-store'});
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${proto}://${window.location.host}/ws`);
 
@@ -181,7 +182,13 @@
 
   // ── Message handler ──────────────────────────────────────
   function handleMessage(msg) {
+    if (msg.type === 'removed') {
+      delete jobsState[msg.job_id];
+      renderAll();
+      return;
+    }
     if (msg.type === 'snapshot') {
+      Object.keys(jobsState).forEach(id => delete jobsState[id]);
       // Initial snapshot of all jobs
       (msg.jobs || []).forEach(job => {
         jobsState[job.id] = job;
@@ -422,6 +429,7 @@
     try {
       const res = await fetch('/jobs');
       const data = await res.json();
+      Object.keys(jobsState).forEach(id => delete jobsState[id]);
       (data.jobs || []).forEach(job => {
         jobsState[job.id] = job;
       });
