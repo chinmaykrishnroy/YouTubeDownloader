@@ -1,64 +1,85 @@
-# YouTube Downloader (Production Grade)
+<div align="center">
 
-A high-performance YouTube downloader and inline player web application built with **FastAPI**, **yt-dlp**, Tailwind CSS, and real-time WebSockets.
+# ⚡ YouTube Downloader
 
----
+<p align="center">
+  <strong>High-performance, asynchronous YouTube media downloader with genuine audio transcoding, real-time WebSocket HUD tracking, and defensive storage management.</strong>
+</p>
 
-## First-Time Run (Step-by-Step)
+[![CI & Release Pipeline](https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml/badge.svg)](https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/chinmaykrishnroy/YouTubeDownloader?color=blue&logo=github)](https://github.com/chinmaykrishnroy/YouTubeDownloader/releases)
+[![Python Version](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![yt-dlp](https://img.shields.io/badge/yt--dlp-Active-FF0000?logo=youtube&logoColor=white)](https://github.com/yt-dlp/yt-dlp)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Tests](https://img.shields.io/badge/Tests-52%20Passed-brightgreen?logo=pytest&logoColor=white)](https://github.com/chinmaykrishnroy/YouTubeDownloader/tree/main/tests)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-To configure and launch the application for the first time:
-
-### Step 1: Create your `.env` configuration file
-Copy the provided `.env.example` template:
-
-- **Windows (Command Prompt)**:
-  ```cmd
-  copy .env.example .env
-  ```
-- **Windows (PowerShell)**:
-  ```powershell
-  Copy-Item .env.example .env
-  ```
-- **Linux & macOS**:
-  ```bash
-  cp .env.example .env
-  ```
-*(You can edit `.env` in any text editor to customize `PORT`, `HOST`, `MAX_CONCURRENT_DOWNLOADS`, etc. Default port is `8000`.)*
-
-### Step 2: Run the Start Script
-Execute the launcher for your operating system:
-
-- **Windows**: Double-click `start.bat` or run:
-  ```cmd
-  start.bat
-  ```
-- **Linux & macOS**: Make executable and run:
-  ```bash
-  chmod +x start.sh scripts/run.sh
-  ./start.sh
-  ```
-
-> **Note**: Even if you skip Step 1, `start.bat` and `./start.sh` will automatically detect the missing `.env` file and generate it from `.env.example` for you. The script automatically sets up `.venv`, installs dependencies, launches the server, and opens your default browser directly to `http://localhost:<PORT>`.
+</div>
 
 ---
 
-## What Happens If I Delete the `downloads/` Folder?
+## 🌟 Key Features
 
-**The application will NEVER crash.**
-
-The server uses defensive directory handling (`DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)`):
-- On startup, the server automatically checks for the downloads directory and creates it if missing.
-- Whenever a download begins, the server verifies the folder exists and creates it on the fly.
-- Periodic cleanup routines safely check folder existence before scanning files.
-
-You can safely delete or empty the `downloads/` folder at any time without worrying about crashes.
+* ⚡ **Asynchronous Non-Blocking Engine**: Built with FastAPI and background worker thread pools (`asyncio.to_thread`), preventing I/O stalls during concurrent downloads.
+* 🎵 **True Audio Transcoding**: Real FFmpeg audio extraction to genuine MP3 with user-selectable bitrates (`320kbps`, `256kbps`, `192kbps`, `128kbps`) and automated `mutagen` ID3 metadata tagging (title, artist, album art).
+* 🖥️ **Draggable Floating HUD**: Interactive bottom-right floating playback and download HUD that can be freely dragged across the viewport with state persistence.
+* 📡 **Real-Time WebSocket Streaming**: Bi-directional real-time updates for progress percentage, transfer rate, ETA, and job state transitions with automatic HTTP polling fallback.
+* 🛡️ **Pre-Flight Verification Gate**: Built-in verification script (`scripts/preflight_check.py`) that audits dependencies, write permissions, live YouTube connectivity, and FFmpeg before startup.
+* 🧹 **Automated Lifecycle & Storage Guard**: Multi-tier auto-cleanup that purges expired downloads when browser sessions close, evicts oldest cache files when disk quotas are reached, and cleans stale partial files.
+* 🔒 **Crash-Proof Directory Management**: Defensive directory handling ensures the application never crashes if the `downloads/` folder is deleted or emptied at runtime.
+* 🐳 **Production Docker Container**: Debian 12 Bookworm base with native FFmpeg, non-root user isolation, and automatic healthcheck monitoring.
 
 ---
 
-## Manual Setup (Without Start Scripts)
+## 🚀 Quick Start
+
+### Option 1: Automated Start Scripts (Recommended)
+
+The automated launchers create a virtual environment (`.venv`), install dependencies, verify pre-flight components, launch the application, and open your browser automatically.
+
+#### 🪟 Windows
+Double-click `start.bat` or run:
+```cmd
+start.bat
+```
+
+#### 🐧 Linux & 🍎 macOS
+Make executable and run:
+```bash
+chmod +x start.sh scripts/run.sh
+./start.sh
+```
+
+---
+
+### Option 2: Docker & Docker Compose
+
+Deploy the application in a sandboxed, production container with pre-configured FFmpeg and health checks:
 
 ```bash
-# 1. Create and activate virtual environment
+# Build and run container in detached mode
+docker compose up -d --build
+
+# View real-time container logs
+docker compose logs -f
+
+# Stop container
+docker compose down
+```
+
+Access the interface at `http://localhost:8000`.
+
+---
+
+### Option 3: Manual Setup
+
+```bash
+# 1. Clone repository
+git clone https://github.com/chinmaykrishnroy/YouTubeDownloader.git
+cd YouTubeDownloader
+
+# 2. Create and activate virtual environment
 python -m venv .venv
 
 # Windows:
@@ -66,104 +87,116 @@ python -m venv .venv
 # Linux/macOS:
 source .venv/bin/activate
 
-# 2. Install dependencies
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 3. Start server
+# 4. Copy configuration
+cp .env.example .env
+
+# 5. Run pre-flight check & start server
+python scripts/preflight_check.py
 python main.py
 ```
 
-Access the application in your browser at `http://localhost:8000`.
-
 ---
 
-## Production Hardening & Auto-Clean Features
+## ⚙️ Configuration
 
-1. **Intelligent Auto-Clean Logic**:
-   - **Post-Download Cleanup**: Once a user completes saving a file to their device via `/files/{job_id}`, the server unlinks the physical file after 90 seconds.
-   - **Session Closure Cleanup**: When all active browser WebSocket sessions disconnect, an auto-clean runs after a 45-second grace period to purge completed downloads and free storage.
-   - **Periodic Garbage Collection**: A background loop scans every 2 minutes, removing files older than 30 minutes (`CLEANUP_TTL_SECONDS`) and cleaning orphaned `.part`/`.ytdl` files.
-   - **Disk Quota Protection**: Enforces a configurable 3GB ceiling (`MAX_DISK_STORAGE_BYTES`); oldest downloads are purged first if the threshold is exceeded.
-   - **Manual Cleanup**: The "Clear finished" and job remove buttons immediately unlink the files from disk.
+Copy `.env.example` to `.env` to customize runtime parameters:
 
-2. **Security & Reliability**:
-   - **Path Traversal Shield**: `/files/{job_id}` strictly verifies path resolution within the downloads folder, blocking any directory traversal.
-   - **Concurrency Semaphore**: Limits simultaneous yt-dlp tasks to 4 concurrent downloads (`MAX_CONCURRENT_DOWNLOADS`) to prevent memory and CPU exhaustion.
-   - **GZip Compression**: All JSON and HTML payloads are compressed on the wire.
-   - **Graceful Lifecycle**: Interrupted temp files are cleaned up on startup and shutdown.
-
-3. **FFmpeg Integration**:
-   - Supports 1080p video merging and high-bitrate MP3 conversion.
-   - If FFmpeg is missing, a persistent dismissible banner provides OS-specific install commands (`winget install Gyan.FFmpeg` for Windows, `apt install ffmpeg` for Linux, `brew install ffmpeg` for macOS).
-
----
-
-## Environment Variables (.env)
-
-All settings can be customized in `.env` (refer to `.env.example`):
+```bash
+cp .env.example .env
+```
 
 | Variable | Default | Description |
-|---|---|---|
-| `HOST` | `0.0.0.0` | IP address to bind HTTP server (`0.0.0.0` for all LAN or `127.0.0.1` for local only) |
-| `PORT` | `8000` | Port number for web server & WebSockets |
-| `RELOAD` | `false` | Enable auto-reload on code change (`true` for development) |
-| `ALLOWED_ORIGINS` | `*` | Comma-separated list of permitted CORS origins |
-| `MAX_CONCURRENT_DOWNLOADS` | `4` | Max parallel yt-dlp worker threads (subsequent tasks queue cleanly) |
-| `DOWNLOADS_DIR_PATH` | `./downloads` | Custom disk path for downloaded media files |
-| `CLEANUP_TTL_SECONDS` | `1800` | Retention period for completed files (30 minutes) |
-| `FILE_POST_DOWNLOAD_CLEANUP_SECONDS` | `90` | Time to keep file after user clicks save |
-| `MAX_DISK_STORAGE_BYTES` | `3221225472` | 3GB storage limit before auto-purging oldest files |
-| `YTDLP_COOKIES_PATH` | `""` | Path to cookies.txt (useful for cloud VPS hosting to bypass YouTube bot blocks) |
-| `YTDLP_PROXY` | `""` | Optional proxy URL (e.g. `http://user:pass@host:port`) |
-| `LOG_LEVEL` | `INFO` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| :--- | :--- | :--- |
+| `HOST` | `0.0.0.0` | Binding network interface IP address |
+| `PORT` | `8000` | Application HTTP & WebSocket listening port |
+| `DOWNLOADS_DIR` | `downloads` | Local directory for temporary storage of downloads |
+| `MAX_CONCURRENT_DOWNLOADS` | `3` | Maximum simultaneous active download tasks |
+| `MAX_DOWNLOADS_CACHE_MB` | `5000` | Disk quota in megabytes before oldest files are purged |
+| `DOWNLOAD_TTL_SECONDS` | `1800` | Time-to-live in seconds before completed files expire |
+| `SESSION_CLEANUP_DELAY_SECONDS`| `30` | Grace period after all client tabs close before auto-cleaning |
+| `AUTO_OPEN_BROWSER` | `true` | Automatically open default browser on local startup |
+| `YTDL_COOKIES_PATH` | *(none)* | Path to optional Netscape cookies file for YouTube authentication |
 
 ---
 
-## Docker Deployment (Production)
+## 🛡️ Pre-Flight Verification Gate
 
-To deploy using Docker and Docker Compose:
+Before the server accepts traffic, [`scripts/preflight_check.py`](scripts/preflight_check.py) verifies critical components:
 
-```bash
-# 1. Build and run in detached mode
-docker-compose up -d --build
-
-# 2. Check logs
-docker-compose logs -f
-
-# 3. Stop container
-docker-compose down
 ```
-The Docker setup includes FFmpeg, non-root Python runtime, persistent download volumes, and automated health checks.
+=================================================================
+   YouTube Downloader - Pre-Flight Component Verification
+=================================================================
+  [1/4] Checking Python dependencies... OK
+  [2/4] Verifying downloads directory permissions... OK
+  [3/4] Performing yt-dlp functional test & YouTube connectivity... OK
+  [4/4] Checking FFmpeg audio/video encoder... OK (Available)
+-----------------------------------------------------------------
+ [OK] All mandatory components passed verification. Starting server...
+=================================================================
+```
+
+If a mandatory component is missing, startup halts immediately with an actionable troubleshooting guide.
 
 ---
 
-## Pre-Flight Verification Gate
+## 🧹 Storage Lifecycle & Deletion Safety
 
-Before the server starts, `scripts/preflight_check.py` automatically validates all mandatory components:
-1. **Python Dependencies**: Verifies imports of `fastapi`, `uvicorn`, `yt_dlp`, `aiofiles`, `mutagen`, `pydantic`.
-2. **Storage Permissions**: Confirms `downloads/` directory exists and is writable.
-3. **yt-dlp Live Functional Test**: Performs a live query to verify yt-dlp extractor health and YouTube connectivity (checks for IP blocks/429 walls).
-4. **FFmpeg Availability**: Audits encoder tools.
+> **What happens if I delete or empty the `downloads/` folder?**
+>
+> **The application will NEVER crash.**
+> The server uses defensive directory handling (`DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)`). It verifies folder existence at boot, recreates it immediately before any write operation, and safely guards cleanup passes against missing directories.
 
-If any mandatory check fails, the pre-flight gate **halts immediately**, raises a fatal exception, and prevents the server or browser from launching in a broken state.
+### Auto-Cleanup Policies:
+1. **Session Disconnect**: When all connected browser tabs disconnect, a background cleaner runs after a 30-second grace window to purge completed downloads.
+2. **TTL Expiration**: Completed downloads older than `DOWNLOAD_TTL_SECONDS` (default: 30 minutes) are automatically unlinked.
+3. **Storage Quota Manager**: If total cache size exceeds `MAX_DOWNLOADS_CACHE_MB`, the oldest files are evicted until disk usage is within bounds.
+4. **Stale Partial Cleanup**: Interrupted `.part` files are removed during startup and routine sweeps.
 
 ---
 
-## Automated Test Suite
+## 🧪 Testing & CI Pipeline
 
-A comprehensive test suite covering 52 test cases (unit helpers, pre-flight verification, storage lifecycle, quota eviction, REST/WebSocket endpoints, path-traversal security, and live NCS Fade audio end-to-end download) is included:
+The project includes a comprehensive suite of **52 automated unit, integration, and end-to-end tests**:
 
 ```bash
-# Run all 52 tests using the unified test runner
+# Run full test suite
 python tests/run_tests.py
-
-# Alternatively, run using pytest
-pytest tests/
-
-# Run the pre-flight verification gate independently
-python scripts/preflight_check.py
-
-# Generate test coverage report
-python -m coverage run --source=main -m unittest discover tests
-python -m coverage report -m
 ```
+
+### GitHub Actions CI Workflow:
+* **Matrix Testing**: Validates every pull request and push against Python `3.11` and `3.12` on both `ubuntu-latest` and `windows-latest`.
+* **Branch Protection**: Builds fail immediately if any unit or integration test fails.
+* **Docker Verification**: Verifies container build and runs live container health checks.
+* **Tagged Release Automation**: Pushing a tag (`v*.*.*`) triggers the release pipeline, generating release notes and attaching standalone release packages.
+
+```bash
+# Create and push a new release tag
+git tag -a v4.0.0 -m "Release v4.0.0"
+git push origin v4.0.0
+```
+
+---
+
+## 📡 API Reference
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/system-status` | System health, active jobs count, and FFmpeg status |
+| `POST` | `/search` | Query YouTube videos (`{"query": "...", "limit": 10}`) |
+| `GET` | `/formats/{video_id}`| Retrieve available video resolutions and audio streams |
+| `POST` | `/download` | Queue a download job (`url`, `format`, `quality`, `title`) |
+| `GET` | `/jobs` | List all active and completed download jobs |
+| `GET` | `/jobs/{job_id}` | Poll current status, progress percentage, speed, and ETA |
+| `DELETE` | `/jobs/{job_id}` | Cancel active download or immediately delete completed file |
+| `GET` | `/files/{job_id}` | Stream and download the completed media file to client |
+| `WS` | `/ws` | Real-time WebSocket connection for progress broadcasts |
+
+---
+
+## 📄 License
+
+Distributed under the [MIT License](LICENSE). Copyright (c) 2023–2026 Chinmay Krishn Roy.

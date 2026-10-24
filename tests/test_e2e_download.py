@@ -56,6 +56,10 @@ class TestE2ENCSDownload(unittest.TestCase):
                 final_job = job_state
                 break
             elif status == "error":
+                err_msg = str(job_state.get('error') or "")
+                # Gracefully skip if YouTube blocks cloud CI runner IPs with bot challenges
+                if any(k in err_msg.lower() for k in ["bot", "sign in", "429", "too many requests", "captcha"]):
+                    self.skipTest(f"Live YouTube download skipped due to IP rate-limiting/bot challenge: {err_msg}")
                 self.fail(f"Download failed with error: {job_state.get('error')}")
 
             time.sleep(2)

@@ -1,0 +1,107 @@
+name: CI & Release Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }} - Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+        python-version: [ "3.11", "3.12" ]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        uses: FedericoCarboni/setup-ffmpeg@v3
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Build-Time Component Pre-Flight Verification
+        run: |
+          python scripts/preflight_check.py --build-time
+
+      - name: Execute Comprehensive Test Suite (52 Tests)
+        run: |
+          python tests/run_tests.py
+
+  docker-build:
+    name: Docker Build & Container Healthcheck
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        run: |
+          docker build -t yt-downloader:ci .
+
+      - name: Verify Container Execution & Healthcheck
+        run: |
+          docker run -d --name yt-ci-test -p 8000:8000 yt-downloader:ci
+          sleep 8
+          curl -f http://localhost:8000/system-status || exit 1
+          docker stop yt-ci-test
+          docker rm yt-ci-test
+
+  release:
+    name: Publish Tagged Release
+    needs: [ test, docker-build ]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create Release Archive
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          zip -r "youtube-downloader-${TAG_NAME}.zip" . \
+            -x "*.git*" \
+            -x "*__pycache__*" \
+            -x "*.pytest_cache*" \
+            -x "*.venv*" \
+            -x "*venv*" \
+            -x "*downloads*" \
+            -x "*.env"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            youtube-downloader-*.zip
+            docker-compose.yml
+            .env.example
