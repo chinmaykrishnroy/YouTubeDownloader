@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+downloads/*
+!downloads/.gitkeep
+.DS_Store
+Thumbs.db
+.coverage
+.pytest_cache/

@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Downloads – YT Downloader</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 70'%3E%3Crect width='100' height='70' rx='15' fill='%23ff0000'/%3E%3Cpolygon points='38,18 38,52 68,35' fill='white'/%3E%3C/svg%3E"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            yt: { red: '#ff0000', dark: '#0f0f0f', card: '#1a1a1a', border: '#272727' }
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: #0f0f0f; color: #fff; font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #0f0f0f; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+    /* Progress bar */
+    .progress-bar { transition: width .4s ease; }
+
+    /* Progress bar animation when downloading */
+    @keyframes progress-pulse {
+      0%,100% { opacity:1; } 50% { opacity:.7; }
+    }
+    .downloading .progress-bar { animation: progress-pulse 1.5s infinite; }
+
+    /* Live indicator pulse */
+    @keyframes live-pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:.4; transform:scale(1.3); }
+    }
+    .live-dot { animation: live-pulse 1.5s infinite; }
+
+    /* Item entrance */
+    @keyframes slide-in {
+      from { opacity:0; transform:translateY(12px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .job-item { animation: slide-in .3s ease; }
+
+    /* Button */
+    .btn-red { background: #ff0000; transition: background .2s; }
+    .btn-red:hover { background: #cc0000; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- ═══════════════════════ NAVBAR ═══════════════════════ -->
+<nav class="sticky top-0 z-40 bg-[#0f0f0f] border-b border-[#272727] px-3 sm:px-6 py-3">
+  <div class="max-w-screen-xl mx-auto flex items-center justify-between gap-3">
+    <!-- Logo -->
+    <a href="/" class="flex items-center gap-2 shrink-0">
+      <svg width="30" height="22" viewBox="0 0 32 22" fill="none">
+        <rect width="32" height="22" rx="5" fill="#ff0000"/>
+        <polygon points="13,5 13,17 22,11" fill="white"/>
+      </svg>
+      <span class="font-bold text-lg tracking-tight hidden sm:inline text-white">YT Downloader</span>
+    </a>
+
+    <!-- Live indicator -->
+    <div id="ws-indicator" class="flex items-center gap-2 text-xs font-medium text-gray-500">
+      <span id="live-dot" class="w-2 h-2 rounded-full bg-gray-600"></span>
+      <span id="ws-status">Connecting…</span>
+    </div>
+
+    <!-- Nav links -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <a href="/" class="p-2 sm:px-3 sm:py-1.5 rounded-full sm:rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors flex items-center gap-1.5" title="Search">
+        <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <span class="hidden sm:inline">Search</span>
+      </a>
+      <a href="/downloads-page" class="p-2 sm:px-3 sm:py-1.5 rounded-full sm:rounded-lg text-sm font-medium text-white bg-[#272727] flex items-center gap-1.5" title="Downloads">
+        <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+        <span class="hidden sm:inline">Downloads</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════ MAIN ═══════════════════════ -->
+<main class="max-w-screen-lg mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-white">Downloads</h1>
+    <button id="clear-btn" onclick="clearCompleted()"
+      class="hidden px-4 py-2 rounded-lg border border-[#303030] text-sm text-gray-400 hover:text-white hover:border-[#555] transition-colors flex items-center gap-2">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+      Clear finished
+    </button>
+  </div>
+
+  <!-- Jobs list -->
+  <div id="jobs-list" class="space-y-3"></div>
+
+  <!-- Empty state (Centered vertically & horizontally on screen) -->
+  <div id="empty-state" class="hidden my-auto flex flex-col items-center justify-center text-center px-4 py-20 min-h-[55vh]">
+    <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#181818] border border-[#272727] flex items-center justify-center mb-5">
+      <svg class="h-8 w-8 sm:h-10 sm:w-10 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+      </svg>
+    </div>
+    <h2 class="text-lg sm:text-2xl font-bold text-white mb-2">No downloads yet</h2>
+    <p class="text-xs sm:text-sm text-gray-400 max-w-sm mb-6 leading-relaxed">Go to the search page to find and download videos.</p>
+    <a href="/" class="bg-[#ff0000] hover:bg-[#cc0000] text-white text-xs sm:text-sm font-semibold px-6 py-2.5 rounded-full transition-colors cursor-pointer shadow-md shadow-red-950/30">
+      Search Videos
+    </a>
+  </div>
+</main>
+
+<!-- ═══════════════════════ SCRIPT ═══════════════════════ -->
+<script>
+  // ── State ────────────────────────────────────────────────
+  const jobsState = {}; // job_id -> job object
+  let ws = null;
+  let reconnectTimer = null;
+
+  // ── WebSocket ────────────────────────────────────────────
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${window.location.host}/ws`);
+
+    ws.addEventListener('open', () => {
+      setWsStatus('live');
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    });
+
+    ws.addEventListener('message', (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        handleMessage(msg);
+      } catch {}
+    });
+
+    ws.addEventListener('close', () => {
+      setWsStatus('disconnected');
+      reconnectTimer = setTimeout(connect, 3000);
+    });
+
+    ws.addEventListener('error', () => {
+      ws.close();
+    });
+
+    // Keep-alive ping every 20s
+    setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send('ping');
+    }, 20000);
+  }
+
+  function setWsStatus(state) {
+    const dot = document.getElementById('live-dot');
+    const txt = document.getElementById('ws-status');
+    if (state === 'live') {
+      dot.className = 'w-2 h-2 rounded-full bg-green-500 live-dot';
+      txt.textContent = 'Live';
+      txt.className = 'text-xs font-medium text-green-400';
+    } else {
+      dot.className = 'w-2 h-2 rounded-full bg-gray-600';
+      txt.textContent = 'Reconnecting…';
+      txt.className = 'text-xs font-medium text-gray-500';
+    }
+  }
+
+  // ── Message handler ──────────────────────────────────────
+  function handleMessage(msg) {
+    if (msg.type === 'snapshot') {
+      // Initial snapshot of all jobs
+      (msg.jobs || []).forEach(job => {
+        jobsState[job.id] = job;
+      });
+      renderAll();
+      return;
+    }
+
+    if (msg.type === 'progress') {
+      if (!jobsState[msg.job_id]) return;
+      Object.assign(jobsState[msg.job_id], {
+        status: msg.status,
+        progress: msg.progress,
+        speed: msg.speed,
+        eta: msg.eta
+      });
+      updateJobElement(msg.job_id);
+      return;
+    }
+
+    if (msg.type === 'complete') {
+      if (!jobsState[msg.job_id]) return;
+      Object.assign(jobsState[msg.job_id], {
+        status: 'complete',
+        progress: 100,
+        filename: msg.filename,
+        file_size: msg.file_size,
+        speed: '',
+        eta: ''
+      });
+      updateJobElement(msg.job_id);
+      updateClearBtn();
+      return;
+    }
+
+    if (msg.type === 'error') {
+      if (!jobsState[msg.job_id]) return;
+      Object.assign(jobsState[msg.job_id], {
+        status: 'error',
+        error: msg.error
+      });
+      updateJobElement(msg.job_id);
+      updateClearBtn();
+      return;
+    }
+  }
+
+  // ── Render all ───────────────────────────────────────────
+  function renderAll() {
+    const list = document.getElementById('jobs-list');
+    list.innerHTML = '';
+
+    const jobArr = Object.values(jobsState).sort((a, b) =>
+      new Date(b.created_at) - new Date(a.created_at)
+    );
+
+    if (jobArr.length === 0) {
+      document.getElementById('empty-state').classList.remove('hidden');
+      updateClearBtn();
+      return;
+    }
+
+    document.getElementById('empty-state').classList.add('hidden');
+    jobArr.forEach(job => {
+      list.appendChild(buildJobElement(job));
+    });
+    updateClearBtn();
+  }
+
+  // ── Build job DOM element ────────────────────────────────
+  function buildJobElement(job) {
+    const el = document.createElement('div');
+    el.id = `job-${job.id}`;
+    el.className = 'job-item bg-[#1a1a1a] border border-[#272727] rounded-xl p-4';
+    el.innerHTML = jobHtml(job);
+    return el;
+  }
+
+  function updateJobElement(jobId) {
+    const el = document.getElementById(`job-${jobId}`);
+    if (!el) {
+      // New job arrived – re-render all
+      const job = jobsState[jobId];
+      if (job) {
+        document.getElementById('empty-state').classList.add('hidden');
+        const list = document.getElementById('jobs-list');
+        const newEl = buildJobElement(job);
+        list.prepend(newEl);
+        updateClearBtn();
+      }
+      return;
+    }
+    el.innerHTML = jobHtml(jobsState[jobId]);
+  }
+
+  function jobHtml(job) {
+    const statusColor = {
+      queued: 'text-gray-400',
+      downloading: 'text-blue-400',
+      processing: 'text-yellow-400',
+      complete: 'text-green-400',
+      error: 'text-red-400'
+    }[job.status] || 'text-gray-400';
+
+    const statusLabel = {
+      queued: 'Queued',
+      downloading: 'Downloading',
+      processing: 'Processing…',
+      complete: 'Complete',
+      error: 'Error'
+    }[job.status] || job.status;
+
+    const fmtBadge = `${job.format === 'audio' ? '🎵' : '🎬'} ${job.format} · ${job.quality}`;
+    const progress = Math.min(100, Math.max(0, job.progress || 0));
+
+    let rightSection = '';
+    if (job.status === 'downloading') {
+      rightSection = `
+        <div class="text-right shrink-0">
+          <p class="text-sm font-semibold text-white">${progress.toFixed(1)}%</p>
+          <p class="text-xs text-blue-400 font-medium">${esc(job.speed || '—')}</p>
+          <p class="text-xs text-gray-500">ETA ${esc(job.eta || '—')}</p>
+        </div>`;
+    } else if (job.status === 'complete') {
+      rightSection = `
+        <div class="text-right shrink-0">
+          ${job.file_size ? `<p class="text-xs text-gray-400 mb-2">${esc(job.file_size)}</p>` : ''}
+          <a href="/files/${esc(job.id)}" download="${esc(getDownloadName(job))}"
+            class="inline-flex items-center gap-1.5 btn-red px-3 py-1.5 rounded-lg text-xs font-medium text-white">
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Save file
+          </a>
+        </div>`;
+    } else if (job.status === 'error') {
+      rightSection = `
+        <div class="text-right shrink-0 max-w-[160px]">
+          <p class="text-xs text-red-400 leading-tight">${esc((job.error || 'Unknown error').slice(0, 120))}</p>
+        </div>`;
+    } else if (job.status === 'processing') {
+      rightSection = `
+        <div class="text-right shrink-0">
+          <p class="text-xs text-yellow-400 animate-pulse">Processing…</p>
+        </div>`;
+    } else {
+      rightSection = `
+        <div class="text-right shrink-0">
+          <p class="text-xs text-gray-500">Queued</p>
+        </div>`;
+    }
+
+    // Progress bar
+    let barColor = '#3b82f6';
+    if (job.status === 'complete') barColor = '#22c55e';
+    if (job.status === 'error') barColor = '#ef4444';
+    if (job.status === 'processing') barColor = '#eab308';
+
+    const isDownloading = job.status === 'downloading' ? 'downloading' : '';
+
+    return `
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center ${isDownloading}">
+        <div class="flex gap-3 flex-1 min-w-0 items-start">
+          <!-- Thumbnail -->
+          <div class="shrink-0 w-24 sm:w-28 aspect-video rounded-lg overflow-hidden bg-[#272727]">
+            ${job.thumbnail
+              ? `<img src="${esc(job.thumbnail)}" alt="" class="w-full h-full object-cover" />`
+              : `<div class="w-full h-full flex items-center justify-center text-gray-600">
+                  <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+                  </svg>
+                </div>`
+            }
+          </div>
+
+          <!-- Info (middle) -->
+          <div class="flex-1 min-w-0 space-y-1.5">
+            <p class="text-xs sm:text-sm font-semibold text-white leading-snug line-clamp-2">${esc(job.title)}</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[11px] bg-[#272727] text-gray-300 px-2 py-0.5 rounded-full">${esc(fmtBadge)}</span>
+              <span class="text-[11px] ${statusColor} font-medium">${statusLabel}</span>
+            </div>
+            <!-- Progress bar -->
+            <div class="w-full bg-[#272727] rounded-full h-1.5 overflow-hidden">
+              <div class="progress-bar h-full rounded-full" style="width:${progress}%;background:${barColor}"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right section & Actions -->
+        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#252525]">
+          ${rightSection}
+          <!-- Remove button -->
+          <button onclick="removeJob('${esc(job.id)}')"
+            class="p-2 text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-[#272727]"
+            title="Remove">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Actions ──────────────────────────────────────────────
+  async function removeJob(jobId) {
+    try {
+      await fetch(`/jobs/${jobId}`, { method: 'DELETE' });
+      delete jobsState[jobId];
+      const el = document.getElementById(`job-${jobId}`);
+      if (el) el.remove();
+      if (Object.keys(jobsState).length === 0) {
+        document.getElementById('empty-state').classList.remove('hidden');
+      }
+      updateClearBtn();
+    } catch (err) {
+      console.error('Remove failed', err);
+    }
+  }
+
+  async function clearCompleted() {
+    const done = Object.values(jobsState).filter(j => j.status === 'complete' || j.status === 'error');
+    for (const job of done) {
+      await removeJob(job.id);
+    }
+  }
+
+  function updateClearBtn() {
+    const hasFinished = Object.values(jobsState).some(j => j.status === 'complete' || j.status === 'error');
+    const btn = document.getElementById('clear-btn');
+    if (hasFinished) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+  }
+
+  // ── Fetch initial jobs from REST (in case we missed events) ─
+  async function fetchJobs() {
+    try {
+      const res = await fetch('/jobs');
+      const data = await res.json();
+      (data.jobs || []).forEach(job => {
+        jobsState[job.id] = job;
+      });
+      renderAll();
+    } catch {}
+  }
+
+  // ── Escape helper ─────────────────────────────────────────
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function getDownloadName(job) {
+    const raw = job.title || 'download';
+    const clean = raw.replace(/[\\/*?:"<>|]/g, '').trim() || 'download';
+    const ext = job.format === 'audio' ? '.mp3' : '.mp4';
+    return clean.slice(0, 160) + ext;
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  fetchJobs();
+  connect();
+</script>
+</body>
+</html>

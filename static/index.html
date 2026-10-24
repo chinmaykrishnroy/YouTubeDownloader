@@ -1,0 +1,1945 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>YT Downloader</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 70'%3E%3Crect width='100' height='70' rx='15' fill='%23ff0000'/%3E%3Cpolygon points='38,18 38,52 68,35' fill='white'/%3E%3C/svg%3E"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- YouTube IFrame API for embed & autoplay events -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f0f; color: #fff; font-family: 'Roboto', Arial, sans-serif; min-height: 100vh; overflow-x: hidden; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f0f0f; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+    /* Skeleton shimmer */
+    @keyframes shimmer { 0%{background-position:-800px 0} 100%{background-position:800px 0} }
+    .skel { background: linear-gradient(90deg,#1c1c1c 25%,#2b2b2b 50%,#1c1c1c 75%); background-size: 800px 100%; animation: shimmer 1.5s infinite; border-radius: 6px; }
+
+    /* Video cards */
+    .yt-card { cursor: pointer; transition: transform .18s ease; }
+    .yt-card:hover { transform: translateY(-2px); }
+    .thumb-wrap { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #202020; }
+    .thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
+    .yt-card:hover .thumb-img { transform: scale(1.03); }
+    
+    .dur-badge {
+      position: absolute; bottom: 8px; left: 8px;
+      background: rgba(0,0,0,.85); color: #fff;
+      font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 4px;
+      letter-spacing: .02em; pointer-events: none;
+    }
+
+    .hover-dl {
+      position: absolute; bottom: 8px; right: 8px; opacity: 0;
+      transform: translateY(4px); transition: opacity .15s ease, transform .15s ease;
+    }
+    .yt-card:hover .hover-dl, .touch-show-dl .hover-dl { opacity: 1; transform: translateY(0); }
+    .hover-dl-btn {
+      background: #ff0000; color: #fff; border: none; border-radius: 6px;
+      padding: 5px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; gap: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.5);
+    }
+    .hover-dl-btn:hover { background: #cc0000; }
+
+    /* Up-next item */
+    .suggest-item {
+      display: flex; gap: 10px; padding: 8px; border-radius: 10px; cursor: pointer;
+      transition: background .15s ease;
+    }
+    .suggest-item:hover { background: #202020; }
+    .suggest-item.active { background: #2a2a2a; border-left: 3px solid #ff0000; }
+
+    /* Progress bar */
+    .progress-bar { transition: width .4s ease; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #1c1c1c; border: 1px solid #383838; color: #fff;
+      padding: 8px 16px; border-radius: 30px; font-size: 13px; font-weight: 500;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; opacity: 0;
+      transition: opacity .25s ease, transform .25s ease, bottom .25s ease; pointer-events: none; z-index: 300;
+      box-shadow: 0 10px 30px rgba(0,0,0,.7); max-width: 90vw;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+
+    /* HUD Bottom-Right Pop-In Animation & Origin */
+    @keyframes hud-pop-in {
+      0% {
+        opacity: 0;
+        transform: scale(0.9) translateY(14px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+    .hud-docked {
+      transform-origin: bottom right !important;
+      animation: hud-pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Header Download Button Highlight & Glow Pulse */
+    @keyframes header-glow {
+      0%, 100% {
+        box-shadow: 0 0 14px rgba(255, 0, 0, 0.85), 0 0 4px rgba(255, 0, 0, 0.6);
+        border-color: #ff3333;
+      }
+      50% {
+        box-shadow: 0 0 24px rgba(255, 0, 0, 1), 0 0 8px rgba(255, 0, 0, 0.9);
+        border-color: #ff6666;
+      }
+    }
+    .header-dl-highlight {
+      background: #ff0000 !important;
+      color: #ffffff !important;
+      border-color: #ff3333 !important;
+      animation: header-glow 1.2s infinite ease-in-out !important;
+    }
+    .header-dl-highlight svg {
+      color: #ffffff !important;
+      stroke: #ffffff !important;
+    }
+    .header-dl-highlight #navDlBadge,
+    .header-dl-highlight #wmDlBadge {
+      background: #ffffff !important;
+      color: #ff0000 !important;
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+<!-- ═══════════════════════════ MISSING FFMPEG WARNING BANNER ═══════════════════════════ -->
+<div id="ffmpeg-banner" class="hidden bg-amber-950/90 border-b border-amber-500/40 text-amber-200 px-4 py-3 text-xs sm:text-sm z-50">
+  <div class="max-w-7xl mx-auto flex items-start sm:items-center justify-between gap-3">
+    <div class="flex items-start sm:items-center gap-2.5">
+      <span class="text-amber-400 font-bold text-base leading-none">⚠️</span>
+      <div>
+        <span class="font-semibold text-amber-300">FFmpeg is not detected in your PATH:</span>
+        <span class="text-amber-200/90 ml-1">High-quality 1080p video merging and MP3 conversion require FFmpeg.</span>
+        <div class="mt-1 flex flex-wrap items-center gap-2 text-xs">
+          <span>Install command:</span>
+          <code id="ffmpeg-install-cmd" class="bg-black/60 text-amber-300 px-2 py-0.5 rounded font-mono select-all">winget install Gyan.FFmpeg</code>
+          <button onclick="copyFfmpegCmd()" class="bg-amber-800/80 hover:bg-amber-700 text-amber-100 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer" title="Copy install command to clipboard" aria-label="Copy install command">
+            Copy
+          </button>
+          <span class="text-amber-300/70 text-[11px]">(then restart server)</span>
+        </div>
+      </div>
+    </div>
+    <button onclick="document.getElementById('ffmpeg-banner').remove()" class="text-amber-400 hover:text-amber-100 p-1 cursor-pointer" title="Dismiss">
+      ✕
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ NAVBAR (Symmetrical 3-column layout) ═══════════════════════════ -->
+<nav class="sticky top-0 z-40 bg-[#0f0f0f] border-b border-[#202020] px-3 sm:px-6 h-14 flex items-center justify-between gap-2 sm:gap-4">
+  <!-- Left: YouTube Icon (Desktop shows text label, mobile shows icon for perfect symmetry) -->
+  <button onclick="switchView('search')" class="flex items-center gap-2 shrink-0 p-1 cursor-pointer bg-transparent border-none text-left" title="Return to Home / Search" aria-label="Return to Home">
+    <svg width="30" height="22" viewBox="0 0 32 22" class="shrink-0">
+      <rect width="32" height="22" rx="5" fill="#ff0000"/>
+      <polygon points="13,5 13,17 22,11" fill="#fff"/>
+    </svg>
+    <span class="hidden sm:inline font-bold text-lg text-white tracking-tight">YT Downloader</span>
+  </button>
+
+  <!-- Center: Search Bar with THIN 1px red border ONLY around the outer perimeter (No inner divider) -->
+  <div class="flex-1 max-w-2xl min-w-0 mx-1 sm:mx-4">
+    <form id="searchForm" class="flex w-full items-stretch border border-[#ff0000] rounded-full overflow-hidden bg-[#121212] focus-within:shadow-[0_0_10px_rgba(255,0,0,0.2)] transition-shadow">
+      <input
+        id="searchInput"
+        type="text"
+        placeholder="Search YouTube..."
+        autocomplete="off"
+        class="w-full bg-transparent text-white placeholder-gray-500 px-3.5 sm:px-5 py-2 text-sm sm:text-base outline-none min-w-0 border-none"
+        title="Type song name, artist, or YouTube URL"
+        aria-label="Search YouTube"
+      />
+      <button
+        type="submit"
+        class="bg-[#242424] hover:bg-[#333] text-white px-3.5 sm:px-5 py-2 text-sm font-medium flex items-center justify-center gap-1.5 shrink-0 transition-colors cursor-pointer border-none"
+        title="Search YouTube"
+        aria-label="Search"
+      >
+        <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <span class="hidden sm:inline font-semibold">Search</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- Right: Downloads SPA Button (Mobile: Symmetrical icon button; Desktop: icon + label, zero page reload) -->
+  <div class="flex items-center shrink-0">
+    <button
+      id="navDlBtn"
+      onclick="handleHeaderDlClick()"
+      class="relative flex items-center justify-center gap-2 p-2 sm:px-3 sm:py-2 rounded-full sm:rounded-lg text-sm font-medium text-gray-300 hover:text-white bg-[#1a1a1a] sm:bg-transparent hover:bg-[#252525] border border-[#333] sm:border-transparent transition-all whitespace-nowrap cursor-pointer"
+      title="Downloads queue & progress"
+      aria-label="Downloads queue and progress"
+    >
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0">
+        <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+      </svg>
+      <span class="hidden sm:inline font-medium">Downloads</span>
+      <span id="navDlBadge" class="hidden bg-[#ff0000] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center leading-tight"></span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════ VIEW 1: SEARCH & RESULTS VIEW ═══════════════════════════ -->
+<div id="search-view" class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col">
+
+  <!-- ── HERO (Centered horizontally & vertically on both mobile and desktop) ── -->
+  <div id="hero" class="my-auto flex flex-col items-center justify-center text-center px-4 py-12 sm:py-20">
+    <div class="max-w-xl mx-auto flex flex-col items-center justify-center space-y-4">
+      <svg width="76" height="52" viewBox="0 0 80 56" class="mx-auto mb-2 drop-shadow">
+        <rect width="80" height="56" rx="14" fill="#ff0000"/>
+        <polygon points="32,14 32,42 56,28" fill="#fff"/>
+      </svg>
+      <h1 class="text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
+        Download any YouTube video
+      </h1>
+      <p class="text-sm sm:text-base text-gray-400 max-w-md mx-auto leading-relaxed">
+        Search by song, artist, or video name — watch inline or download in your quality.
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-6 pt-3 text-xs sm:text-sm text-gray-400">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#ff0000]"></span>
+          <span>Video up to 1080p</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#ff0000]"></span>
+          <span>MP3 audio</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#ff0000]"></span>
+          <span>Real-time progress</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SKELETON LOADING ── -->
+  <div id="skeleton-area" class="hidden">
+    <div class="skel h-5 w-48 mb-6"></div>
+    <div id="skelGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5"></div>
+  </div>
+
+  <!-- ── SEARCH RESULTS ── -->
+  <div id="results-area" class="hidden">
+    <div class="flex items-center justify-between mb-5">
+      <p id="resultsHeading" class="text-sm sm:text-base font-normal text-gray-300"></p>
+    </div>
+    <div id="cards-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5"></div>
+  </div>
+
+  <!-- ── ERROR STATE ── -->
+  <div id="error-area" class="hidden flex-col items-center justify-center py-20 text-center gap-4">
+    <svg width="56" height="56" fill="none" stroke="#555" stroke-width="1.5" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".8" fill="#555"/>
+    </svg>
+    <p id="error-msg" class="text-sm sm:text-base text-gray-400 max-w-md"></p>
+    <button onclick="showHero()" class="bg-[#202020] hover:bg-[#303030] text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors cursor-pointer" title="Return to home screen" aria-label="Go back">
+      Go back
+    </button>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════ VIEW 2: DOWNLOADS SPA VIEW (Zero reload) ═══════════════════════════ -->
+<div id="downloads-view" class="hidden flex-1 max-w-screen-lg w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-col">
+  <!-- Header with clear Navigation back to YouTube Search -->
+  <div class="flex items-center justify-between mb-6 gap-3">
+    <div class="flex items-center gap-3 flex-wrap">
+      <button onclick="switchView('search')" class="inline-flex items-center gap-1.5 text-xs sm:text-sm text-gray-300 hover:text-white bg-[#1c1c1c] hover:bg-[#282828] border border-[#333] px-3 py-1.5 rounded-lg transition-colors cursor-pointer" title="Return to YouTube Search page" aria-label="Return to YouTube Search">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        <span class="font-medium">Back to Search</span>
+      </button>
+      <h1 class="text-2xl font-bold text-white">Downloads</h1>
+      <!-- Live WS indicator -->
+      <div class="flex items-center gap-2 text-xs font-medium text-gray-400 bg-[#1c1c1c] px-3 py-1 rounded-full border border-[#2c2c2c]">
+        <span id="live-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="ws-status">Live</span>
+      </div>
+    </div>
+    <button id="clear-btn" onclick="clearCompleted()" class="hidden px-3.5 py-1.5 rounded-lg border border-[#303030] text-xs sm:text-sm text-gray-400 hover:text-white hover:border-[#555] transition-colors flex items-center gap-2 cursor-pointer" title="Clear completed and error download jobs" aria-label="Clear finished jobs">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+      Clear finished
+    </button>
+  </div>
+
+  <!-- Downloads list -->
+  <div id="jobs-list" class="space-y-3"></div>
+
+  <!-- ── DOWNLOADS EMPTY STATE (Centered vertically & horizontally on screen) ── -->
+  <div id="dl-empty-state" class="hidden my-auto flex flex-col items-center justify-center text-center px-4 py-16">
+    <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#181818] border border-[#272727] flex items-center justify-center mb-5">
+      <svg class="h-8 w-8 sm:h-10 sm:w-10 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+      </svg>
+    </div>
+    <h2 class="text-lg sm:text-2xl font-bold text-white mb-2">No downloads yet</h2>
+    <p class="text-xs sm:text-sm text-gray-400 max-w-sm mb-6 leading-relaxed">
+      Go to the search page to find and download videos.
+    </p>
+    <button onclick="switchView('search')" class="bg-[#ff0000] hover:bg-[#cc0000] text-white text-xs sm:text-sm font-semibold px-6 py-2.5 rounded-full transition-colors cursor-pointer shadow-md shadow-red-950/30" title="Go to search page to find and download videos" aria-label="Search videos">
+      Search Videos
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ WATCH MODAL & SEAMLESS MINI-PLAYER ═══════════════════════════ -->
+<div id="watch-modal" class="hidden fixed inset-0 z-50 bg-[#0f0f0f] flex flex-col overflow-hidden">
+  <!-- Full Mode Top Bar -->
+  <div id="watch-full-topbar" class="h-14 border-b border-[#202020] px-3 sm:px-6 flex items-center justify-between shrink-0 bg-[#0f0f0f]">
+    <div class="flex items-center gap-2 truncate pr-4">
+      <svg width="26" height="18" viewBox="0 0 32 22" class="shrink-0">
+        <rect width="32" height="22" rx="5" fill="#ff0000"/>
+        <polygon points="13,5 13,17 22,11" fill="#fff"/>
+      </svg>
+      <span class="text-sm font-medium text-gray-300 truncate" id="wmTopTitle">Now Playing</span>
+    </div>
+
+    <div class="flex items-center gap-2 shrink-0">
+      <!-- Direct Jump to Downloads from Player Header -->
+      <button
+        id="wmDlBtn"
+        onclick="handleHeaderDlClick()"
+        class="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-200 hover:text-white bg-[#1a1a1a] hover:bg-[#262626] border border-[#333] transition-all cursor-pointer"
+        title="Downloads queue & progress"
+        aria-label="Downloads queue and progress"
+      >
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+        <span class="hidden xs:inline">Downloads</span>
+        <span id="wmDlBadge" class="hidden bg-[#ff0000] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full min-w-[18px] text-center leading-tight"></span>
+      </button>
+
+      <!-- Minimize Button (Docks into floating mini-player bar, continuous playback) -->
+      <button
+        onclick="minimizeWatch()"
+        class="text-gray-400 hover:text-white p-2 rounded-full hover:bg-[#202020] transition-colors shrink-0 cursor-pointer"
+        title="Minimize player (keep audio playing in background)"
+        aria-label="Minimize player"
+      >
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+
+      <!-- Close Button (Stops playback and dismisses player) -->
+      <button
+        onclick="closeWatch()"
+        class="text-gray-400 hover:text-white p-2 rounded-full hover:bg-[#202020] transition-colors shrink-0 cursor-pointer"
+        title="Close player and stop audio playback"
+        aria-label="Close player"
+      >
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal Main Body (Transforms into compact bar in mini mode) -->
+  <div id="watch-main-body" class="flex-1 overflow-y-auto">
+    <div id="watch-layout-grid" class="max-w-[1600px] mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT COLUMN: Player + Details + Animated Switch Download Bar -->
+      <div id="watch-player-col" class="lg:col-span-8 flex flex-col gap-4">
+        
+        <!-- Player & Mini Row Container -->
+        <div id="player-and-mini-row" class="w-full relative">
+          <!-- 16:9 Player container (Stays mounted in DOM to guarantee zero reload and unbroken audio) -->
+          <div id="player-dock" class="relative w-full aspect-video rounded-xl overflow-hidden bg-black shadow-2xl transition-all duration-200">
+            <div id="ytPlayerContainer" class="w-full h-full"></div>
+            <!-- Click-to-expand overlay in mini mode -->
+            <div id="mini-expand-overlay" class="hidden absolute inset-0 bg-black/40 hover:bg-black/15 flex items-center justify-center cursor-pointer transition-colors" onclick="expandWatch(event)" title="Click to expand player">
+              <svg width="22" height="22" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Mini Player Controls & Info (ONLY visible when minimized) -->
+          <div id="mini-player-bar" class="hidden flex-1 min-w-0 flex items-center justify-between gap-1.5 sm:gap-2.5">
+            <!-- Drag Handle Grip -->
+            <div class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 p-1 shrink-0 flex items-center justify-center select-none" title="Drag to reposition HUD anywhere on screen" aria-label="Drag HUD handle">
+              <svg width="10" height="18" viewBox="0 0 10 18" fill="currentColor" class="pointer-events-none opacity-50 hover:opacity-100 transition-opacity">
+                <circle cx="2.5" cy="3" r="1.5"/><circle cx="7.5" cy="3" r="1.5"/>
+                <circle cx="2.5" cy="9" r="1.5"/><circle cx="7.5" cy="9" r="1.5"/>
+                <circle cx="2.5" cy="15" r="1.5"/><circle cx="7.5" cy="15" r="1.5"/>
+              </svg>
+            </div>
+
+            <!-- Title & Channel (Click to expand) -->
+            <div class="flex-1 min-w-0 cursor-pointer pr-1" onclick="expandWatch(event)" title="Click to expand player">
+              <p id="miniTitle" class="text-xs sm:text-sm font-semibold text-white line-clamp-1 hover:text-red-400 transition-colors"></p>
+              <p id="miniChannel" class="text-[11px] text-gray-400 truncate"></p>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span id="miniStateDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="miniStateText" class="text-[10px] text-emerald-400 font-medium">Playing audio</span>
+              </div>
+            </div>
+
+            <!-- Mini Action Buttons -->
+            <div class="flex items-center gap-1 shrink-0">
+              <!-- Play / Pause -->
+              <button
+                id="miniPlayPauseBtn"
+                onclick="toggleMiniPlayPause(event)"
+                class="w-8 h-8 rounded-full bg-[#262626] hover:bg-[#333] text-white flex items-center justify-center transition-colors cursor-pointer"
+                title="Play/Pause"
+              >
+                <svg id="miniIconPause" width="13" height="13" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+                </svg>
+                <svg id="miniIconPlay" class="hidden ml-0.5" width="13" height="13" fill="currentColor" viewBox="0 0 24 24">
+                  <polygon points="5,3 19,12 5,21"/>
+                </svg>
+              </button>
+
+              <!-- Expand / Back to Video -->
+              <button
+                onclick="expandWatch(event)"
+                class="w-8 h-8 rounded-full bg-[#262626] hover:bg-[#333] text-white flex items-center justify-center transition-colors cursor-pointer"
+                title="Back to video (Expand)"
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                </svg>
+              </button>
+
+              <!-- Close player & stop playback -->
+              <button
+                onclick="closeWatch(event)"
+                class="w-8 h-8 rounded-full text-gray-400 hover:text-white hover:bg-[#262626] flex items-center justify-center transition-colors cursor-pointer"
+                title="Close player"
+              >
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Video metadata & download section (ONLY visible in full mode) -->
+        <div id="watch-full-meta-section" class="space-y-3">
+          <h1 id="wmTitle" class="text-lg sm:text-2xl font-bold text-white leading-snug"></h1>
+          <div class="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-[#222]">
+            <div class="flex items-center gap-3">
+              <div id="wmAvatar" class="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center font-bold text-white uppercase text-base shrink-0">
+                Y
+              </div>
+              <div>
+                <p id="wmChannel" class="text-sm sm:text-base font-semibold text-white"></p>
+                <p id="wmViews" class="text-xs text-gray-400"></p>
+              </div>
+            </div>
+
+            <!-- Autoplay Toggle Button (Same size/shape, default ON, turns gray when OFF) -->
+            <button
+              id="autoplayBtn"
+              onclick="toggleAutoplay()"
+              type="button"
+              class="flex items-center gap-2 bg-[#1c1c1c] hover:bg-[#252525] px-3.5 py-1.5 rounded-full border border-[#2c2c2c] text-xs text-gray-300 transition-colors cursor-pointer select-none"
+              title="Toggle autoplay next video"
+            >
+              <span id="autoplayDot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="autoplayLabel" class="font-medium">Autoplay Next On</span>
+            </button>
+          </div>
+
+          <!-- Download Box: Collapsible Accordion on mobile with > icon rotating to down icon, and ALL options in ONE row -->
+          <div class="bg-[#181818] border border-[#2a2a2a] rounded-xl overflow-hidden transition-all duration-200">
+            <!-- Accordion Toggle Button (Shows '>' chevron on mobile, rotates to down '⌄' when clicked) -->
+            <button
+              id="dlAccordionBtn"
+              type="button"
+              onclick="toggleDlAccordion()"
+              class="w-full flex items-center justify-between px-3.5 py-2.5 sm:py-3 hover:bg-[#202020] text-left transition-colors cursor-pointer select-none"
+              title="Toggle download format and quality options"
+              aria-label="Download options"
+            >
+              <div class="flex items-center gap-2.5 min-w-0">
+                <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" class="text-red-500 shrink-0">
+                  <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                <span class="text-xs sm:text-sm font-semibold text-white truncate">Download This Video</span>
+                <span class="hidden sm:inline text-[11px] text-gray-400">· MP4 Video or MP3 Audio</span>
+              </div>
+
+              <!-- Chevron: Right '>' on mobile, rotates 90deg to down '⌄' when expanded -->
+              <div class="flex items-center gap-1.5 shrink-0 pl-2">
+                <span id="dlAccordionHint" class="text-[11px] text-gray-400 sm:hidden">Format &amp; Quality</span>
+                <svg id="dlAccordionChevron" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="text-gray-400 transition-transform duration-200 shrink-0">
+                  <path d="M9 5l7 7-7 7"/>
+                </svg>
+              </div>
+            </button>
+
+            <!-- Collapsible Body: ALL 3 COLUMNS IN A SINGLE HORIZONTAL ROW (no 3 stacked rows!) -->
+            <div id="dlAccordionBody" class="hidden border-t border-[#252525] p-2 sm:p-3 bg-[#141414]">
+              <div class="flex flex-row items-center gap-1.5 sm:gap-2.5 w-full">
+                <!-- Column 1: Video / Music switch button -->
+                <div class="relative flex items-center bg-[#1c1c1c] border border-[#333] rounded-xl p-0.5 h-[38px] sm:h-[42px] shrink-0 w-[122px] sm:w-48 select-none" title="Choose format (Video MP4 or Audio MP3)">
+                  <div id="wThumb" class="absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-[#ff0000] rounded-lg shadow-md transition-transform duration-200 ease-out left-0.5 transform translate-x-0 pointer-events-none"></div>
+
+                  <button type="button" id="wTabVid" onclick="wFmt('video')" class="relative z-10 flex-1 h-full flex items-center justify-center gap-1 text-[11px] sm:text-xs font-semibold text-white transition-colors cursor-pointer" title="Download as MP4 Video">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="4" width="15" height="16" rx="2"/><path d="m17 8 5-3v14l-5-3V8z"/></svg>
+                    <span>Video</span>
+                  </button>
+                  <button type="button" id="wTabAud" onclick="wFmt('audio')" class="relative z-10 flex-1 h-full flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors cursor-pointer" title="Download as MP3 Audio">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    <span>MP3</span>
+                  </button>
+                </div>
+
+                <!-- Column 2: Quality select -->
+                <select id="wQuality" class="bg-[#1c1c1c] border border-[#333] text-white px-2 sm:px-3 rounded-xl text-xs sm:text-sm outline-none focus:border-[#ff0000] cursor-pointer h-[38px] sm:h-[42px] shrink-0 w-[78px] sm:w-[110px]" title="Select download resolution or bitrate">
+                  <option value="1080p">1080p</option>
+                  <option value="720p" selected>720p</option>
+                  <option value="480p">480p</option>
+                  <option value="360p">360p</option>
+                </select>
+
+                <!-- Column 3: Download Button -->
+                <button
+                  id="wDlBtn"
+                  onclick="doWatchDownload()"
+                  class="flex-1 bg-[#ff0000] hover:bg-[#cc0000] text-white font-semibold text-xs sm:text-sm px-2.5 sm:px-5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-red-950/40 cursor-pointer h-[38px] sm:h-[42px] min-w-0 truncate"
+                  title="Add video to download queue"
+                  aria-label="Add to download queue"
+                >
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" class="shrink-0"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                  <span id="wDlBtnText" class="truncate">Download</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Up Next / Suggestions Queue -->
+      <div id="watch-full-suggestions-col" class="lg:col-span-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between pb-1">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span>Up Next</span>
+            <span id="suggestCount" class="text-xs font-normal text-gray-400"></span>
+          </h2>
+          <span class="text-[11px] text-gray-500">Plays automatically when ended</span>
+        </div>
+
+        <div id="suggestList" class="flex flex-col gap-2 max-h-[750px] overflow-y-auto pr-1">
+          <!-- Suggestion rows injected dynamically -->
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ QUICK DOWNLOAD MODAL (Tile) ═══════════════════════════ -->
+<div id="dl-panel" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm items-center justify-center p-3">
+  <div class="bg-[#1f1f1f] border border-[#333] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 border-b border-[#2d2d2d]">
+      <h3 class="font-semibold text-white text-base flex items-center gap-2">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+        Download Media
+      </h3>
+      <button onclick="closePanel()" class="text-gray-400 hover:text-white p-1 rounded-full cursor-pointer" title="Close download options" aria-label="Close modal">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="p-5 space-y-4">
+      <!-- Media preview -->
+      <div class="flex gap-3 bg-[#171717] p-2.5 rounded-xl border border-[#2a2a2a]">
+        <img id="dlpThumb" src="" alt="" class="w-24 aspect-video object-cover rounded-lg bg-[#272727] shrink-0"/>
+        <p id="dlpName" class="text-xs sm:text-sm text-gray-200 line-clamp-3 font-medium leading-snug"></p>
+      </div>
+
+      <!-- Format selector (Animated switch matching quality and submit button height) -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Format</label>
+        <div class="relative flex items-center bg-[#141414] border border-[#383838] rounded-xl p-1 h-[44px] select-none">
+          <!-- Animated sliding red thumb -->
+          <div id="pThumb" class="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-[#ff0000] rounded-lg shadow-md transition-transform duration-300 ease-out left-1 transform translate-x-0 pointer-events-none"></div>
+
+          <button type="button" id="pTabVid" onclick="pFmt('video')" class="relative z-10 flex-1 h-full flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-white transition-colors duration-200 cursor-pointer" title="Download as Video (MP4)" aria-label="Format Video">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="2" y="4" width="15" height="16" rx="2"/><path d="m17 8 5-3v14l-5-3V8z"/>
+            </svg>
+            <span>Video</span>
+          </button>
+          <button type="button" id="pTabAud" onclick="pFmt('audio')" class="relative z-10 flex-1 h-full flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors duration-200 cursor-pointer" title="Download as Audio (MP3)" aria-label="Format Audio MP3">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+            </svg>
+            <span>Audio (MP3)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quality selector (Matching h-[44px]) -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Quality</label>
+        <select id="pQuality" class="w-full bg-[#141414] border border-[#383838] text-white px-3.5 rounded-xl text-sm outline-none focus:border-[#ff0000] cursor-pointer h-[44px]" title="Select download quality" aria-label="Select quality">
+          <option value="1080p">1080p – Full HD</option>
+          <option value="720p" selected>720p – HD</option>
+          <option value="480p">480p – SD</option>
+          <option value="360p">360p – Low</option>
+        </select>
+      </div>
+
+      <!-- Submit button (Matching h-[44px]) -->
+      <button onclick="doPanelDownload()" class="w-full bg-[#ff0000] hover:bg-[#cc0000] text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-red-950/40 cursor-pointer h-[44px]" title="Add to download queue" aria-label="Add to download queue">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+        <span>Add to Download Queue</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ TOAST WITH ACTION BUTTON ═══════════════════════════ -->
+<div id="toast">
+  <div class="flex items-center gap-2 min-w-0">
+    <span id="toastDot" class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+    <span id="toastMsg" class="truncate"></span>
+  </div>
+  <button id="toastAction" class="hidden ml-2 bg-[#ff0000] hover:bg-[#cc0000] text-white font-semibold px-3 py-1 rounded-full text-xs transition-colors cursor-pointer shrink-0" title="Perform notification action" aria-label="Notification action"></button>
+</div>
+
+<!-- ═══════════════════════════ SCRIPT ═══════════════════════════ -->
+<script>
+/* ── Global State ── */
+let currentView = 'search'; // 'search' or 'downloads'
+let watchState = 'closed';  // 'closed' | 'full' | 'mini'
+let currentVideos = [];     // videos returned by current search
+let upcomingQueue = [];     // ordered queue of upcoming suggestions
+const sessionPlayed = new Set(); // IDs of videos played in this session to prevent looping
+let activeVideo = null;      // video currently playing
+let panelVideo = null;       // video selected for quick download modal
+let watchFmt = 'video';
+let panelFmt = 'video';
+let ytPlayer = null;
+let ytApiReady = false;
+let autoplayEnabled = true;  // Autoplay ON by default
+let consecutiveErrors = 0;
+
+/* ── Jobs & WebSocket State ── */
+const jobsState = {};
+let ws = null;
+let reconnectTimer = null;
+
+/* ── YouTube API Ready Hook ── */
+window.onYouTubeIframeAPIReady = function() {
+  ytApiReady = true;
+};
+
+/* ── Safe HTML escaping ── */
+function h(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function initial(name) {
+  const s = String(name || '?').trim();
+  return s.length > 0 ? s[0].toUpperCase() : '?';
+}
+
+/* ═══════════════════════════ DOWNLOAD ACCORDION & HEADER HIGHLIGHT ═══════════════════════════ */
+let dlAccordionOpen = false;
+
+function initDlAccordion() {
+  const body = document.getElementById('dlAccordionBody');
+  const chevron = document.getElementById('dlAccordionChevron');
+  const hint = document.getElementById('dlAccordionHint');
+  if (!body || !chevron) return;
+
+  // On desktop (>= 640px), default open; on mobile (< 640px), default closed with '>'
+  if (window.innerWidth >= 640) {
+    dlAccordionOpen = true;
+    body.classList.remove('hidden');
+    chevron.classList.add('rotate-90');
+    if (hint) hint.textContent = 'Close';
+  } else {
+    dlAccordionOpen = false;
+    body.classList.add('hidden');
+    chevron.classList.remove('rotate-90');
+    if (hint) hint.textContent = 'Format & Quality';
+  }
+}
+
+function toggleDlAccordion() {
+  dlAccordionOpen = !dlAccordionOpen;
+  const body = document.getElementById('dlAccordionBody');
+  const chevron = document.getElementById('dlAccordionChevron');
+  const hint = document.getElementById('dlAccordionHint');
+
+  if (dlAccordionOpen) {
+    body.classList.remove('hidden');
+    chevron.classList.add('rotate-90');
+    if (hint) hint.textContent = 'Close';
+  } else {
+    body.classList.add('hidden');
+    chevron.classList.remove('rotate-90');
+    if (hint) hint.textContent = 'Format & Quality';
+  }
+}
+
+let highlightTimeout = null;
+
+function highlightHeaderDl() {
+  const navBtn = document.getElementById('navDlBtn');
+  const wmBtn = document.getElementById('wmDlBtn');
+
+  [navBtn, wmBtn].forEach(btn => {
+    if (!btn) return;
+    btn.classList.add('header-dl-highlight');
+    btn.setAttribute('title', 'Added to queue! Click to view Downloads');
+  });
+
+  updateDlBadges();
+
+  if (highlightTimeout) clearTimeout(highlightTimeout);
+  highlightTimeout = setTimeout(() => {
+    clearHeaderDlHighlight();
+  }, 10000);
+}
+
+function clearHeaderDlHighlight() {
+  const navBtn = document.getElementById('navDlBtn');
+  const wmBtn = document.getElementById('wmDlBtn');
+
+  [navBtn, wmBtn].forEach(btn => {
+    if (!btn) return;
+    btn.classList.remove('header-dl-highlight');
+    btn.setAttribute('title', 'Downloads queue & progress');
+  });
+}
+
+function isWatchModalOpen() {
+  const modal = document.getElementById('watch-modal');
+  return modal && !modal.classList.contains('hidden');
+}
+
+function handleHeaderDlClick() {
+  clearHeaderDlHighlight();
+  if (activeVideo && isWatchModalOpen() && watchState !== 'mini') {
+    minimizeWatch();
+  }
+  switchView('downloads');
+}
+
+/* ═══════════════════════════ SPA VIEW SWITCHING (Zero reload) ═══════════════════════════ */
+function switchView(viewName, pushHistory = true) {
+  currentView = viewName;
+  const searchView = document.getElementById('search-view');
+  const dlView = document.getElementById('downloads-view');
+  const navDlBtn = document.getElementById('navDlBtn');
+
+  // If user switches to downloads while watch player is visible in full mode, minimize it!
+  if (viewName === 'downloads') {
+    if (activeVideo && isWatchModalOpen() && watchState !== 'mini') {
+      minimizeWatch();
+    }
+    clearHeaderDlHighlight();
+    searchView.classList.add('hidden');
+    dlView.classList.remove('hidden');
+    dlView.classList.add('flex');
+    navDlBtn.classList.add('text-white', 'bg-[#ff0000]', 'border-transparent');
+    navDlBtn.classList.remove('text-gray-300', 'bg-[#1a1a1a]', 'sm:bg-transparent', 'hover:bg-[#252525]', 'border-[#333]', 'sm:border-transparent');
+    if (pushHistory) history.pushState({view: 'downloads'}, '', '/downloads-page');
+    fetchJobs();
+    renderDownloads();
+  } else {
+    dlView.classList.add('hidden');
+    dlView.classList.remove('flex');
+    searchView.classList.remove('hidden');
+    navDlBtn.classList.remove('text-white', 'bg-[#ff0000]', 'border-transparent');
+    navDlBtn.classList.add('text-gray-300', 'bg-[#1a1a1a]', 'sm:bg-transparent', 'hover:bg-[#252525]', 'border-[#333]', 'sm:border-transparent');
+    if (pushHistory) history.pushState({view: 'search'}, '', '/');
+  }
+}
+
+window.addEventListener('popstate', (e) => {
+  const view = (e.state && e.state.view) || (location.pathname === '/downloads-page' ? 'downloads' : 'search');
+  switchView(view, false);
+});
+
+/* ── UI View Helpers for Search ── */
+function hideAll() {
+  document.getElementById('hero').classList.add('hidden');
+  document.getElementById('skeleton-area').classList.add('hidden');
+  document.getElementById('results-area').classList.add('hidden');
+  document.getElementById('error-area').classList.add('hidden');
+}
+
+function showHero() {
+  hideAll();
+  document.getElementById('hero').classList.remove('hidden');
+}
+
+function showSkeleton(n) {
+  hideAll();
+  const g = document.getElementById('skelGrid');
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    html += `
+      <div class="space-y-3">
+        <div class="skel w-full aspect-video rounded-xl"></div>
+        <div class="flex gap-2.5">
+          <div class="skel w-9 h-9 rounded-full shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skel h-3.5 w-11/12"></div>
+            <div class="skel h-3 w-7/12"></div>
+            <div class="skel h-3 w-4/12"></div>
+          </div>
+        </div>
+      </div>`;
+  }
+  g.innerHTML = html;
+  document.getElementById('skeleton-area').classList.remove('hidden');
+}
+
+function showError(msg) {
+  hideAll();
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('error-area').classList.remove('hidden');
+  document.getElementById('error-area').classList.add('flex');
+}
+
+/* ── Check FFmpeg Status on Startup ── */
+async function checkSystemStatus() {
+  try {
+    const res = await fetch('/system-status');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.has_ffmpeg) {
+      const banner = document.getElementById('ffmpeg-banner');
+      const cmdEl = document.getElementById('ffmpeg-install-cmd');
+      if (cmdEl && data.install_cmd) cmdEl.textContent = data.install_cmd;
+      banner.classList.remove('hidden');
+    }
+  } catch (err) {
+    console.warn('System status check skipped', err);
+  }
+}
+function copyFfmpegCmd() {
+  const cmd = document.getElementById('ffmpeg-install-cmd').textContent;
+  navigator.clipboard.writeText(cmd).then(() => toast('Command copied to clipboard!'));
+}
+
+/* ── Search Handler ── */
+document.getElementById('searchForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const q = document.getElementById('searchInput').value.trim();
+  if (q) {
+    if (currentView !== 'search') switchView('search');
+    doSearch(q);
+  }
+});
+
+async function doSearch(query) {
+  showSkeleton(12);
+  try {
+    const res = await fetch('/search', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query: query, limit: 16})
+    });
+    if (!res.ok) throw new Error('Search request failed (HTTP ' + res.status + ')');
+    const data = await res.json();
+    currentVideos = data.results || [];
+    renderResults(query, currentVideos);
+  } catch (err) {
+    console.error('Search error:', err);
+    showError('Search error: ' + err.message);
+  }
+}
+
+function renderResults(query, videos) {
+  if (!videos.length) {
+    showError(`No results found for "${query}". Try different keywords.`);
+    return;
+  }
+
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = '';
+
+  videos.forEach((v) => {
+    const card = document.createElement('div');
+    card.className = 'yt-card flex flex-col';
+
+    const fallbackSrc = `https://i.ytimg.com/vi/${h(v.id)}/hqdefault.jpg`;
+    const thumbSrc = v.thumbnail || fallbackSrc;
+    const durBadge = v.duration ? `<span class="dur-badge">${h(v.duration)}</span>` : '';
+
+    card.setAttribute('title', `Click to watch: ${v.title}`);
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+
+    card.innerHTML = `
+      <div class="thumb-wrap">
+        <img class="thumb-img" src="${h(thumbSrc)}" alt="" loading="lazy"
+             onerror="this.onerror=null;this.src='${fallbackSrc}'" />
+        ${durBadge}
+        <div class="hover-dl">
+          <button class="hover-dl-btn" data-action="quick-dl" title="Quick download: ${h(v.title)}" aria-label="Quick download">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+            Download
+          </button>
+        </div>
+      </div>
+      <div class="flex gap-2.5 pt-3">
+        <div class="w-9 h-9 rounded-full bg-[#2a2a2a] text-white flex items-center justify-center font-bold text-xs uppercase shrink-0">
+          ${initial(v.channel)}
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-sm font-semibold text-white leading-snug line-clamp-2 mb-1">${h(v.title)}</h3>
+          <p class="text-xs text-gray-400 truncate">${h(v.channel)}</p>
+          <p class="text-xs text-gray-500">${h(v.view_count)}</p>
+        </div>
+      </div>`;
+
+    // Click handler: play video
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('[data-action="quick-dl"]')) return;
+      openWatch(v, true);
+    });
+
+    // Quick download button handler
+    const dlBtn = card.querySelector('[data-action="quick-dl"]');
+    dlBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPanel(v);
+    });
+
+    grid.appendChild(card);
+  });
+
+  document.getElementById('resultsHeading').innerHTML =
+    `Results for <strong class="text-white font-semibold">"${h(query)}"</strong> &nbsp;&middot;&nbsp; ${videos.length} videos`;
+
+  hideAll();
+  document.getElementById('results-area').classList.remove('hidden');
+}
+
+/* ═══════════════════════════ WATCH MODAL & SEAMLESS MINI-PLAYER ═══════════════════════════ */
+async function openWatch(video, fromUserClick = true) {
+  activeVideo = video;
+  consecutiveErrors = 0;
+  sessionPlayed.add(video.id);
+
+  if (fromUserClick) {
+    // When user clicks a video from search results, start queue from rest of search results
+    upcomingQueue = currentVideos.filter(v => v.id !== video.id && !sessionPlayed.has(v.id));
+  } else {
+    // Autoplay or clicked from suggestions: just remove this video from queue
+    upcomingQueue = upcomingQueue.filter(v => v.id !== video.id);
+  }
+
+  renderSuggestions();
+
+  // Populate UI
+  document.getElementById('wmTopTitle').textContent = video.title;
+  document.getElementById('wmTitle').textContent = video.title;
+  document.getElementById('wmChannel').textContent = video.channel || 'Unknown';
+  document.getElementById('wmViews').textContent = video.view_count || '';
+  document.getElementById('wmAvatar').textContent = initial(video.channel);
+
+  const btnText = document.getElementById('wDlBtnText');
+  if (btnText) btnText.textContent = 'Download';
+
+  initDlAccordion();
+  wFmt('video');
+
+  const modal = document.getElementById('watch-modal');
+  modal.classList.remove('hidden');
+
+  if (fromUserClick || watchState !== 'mini') {
+    expandWatch();
+  } else {
+    // Autoplay advanced while in mini state: update title/channel
+    document.getElementById('miniTitle').textContent = video.title;
+    document.getElementById('miniChannel').textContent = video.channel || 'YouTube';
+    updateMiniPlayState();
+  }
+
+  // Mount/play via YouTube IFrame API
+  mountYouTubePlayer(video.id);
+
+  // Dynamically append new recommendations for this playing song (filtered against sessionPlayed)
+  fetchRelatedVideos(video);
+}
+
+function mountYouTubePlayer(videoId) {
+  const container = document.getElementById('ytPlayerContainer');
+
+  if (ytPlayer && ytPlayer.loadVideoById) {
+    try {
+      ytPlayer.loadVideoById(videoId);
+      return;
+    } catch (e) {
+      console.warn('loadVideoById failed, recreating player', e);
+    }
+  }
+
+  // Clear and mount new player
+  container.innerHTML = `<div id="ytIframePlayer"></div>`;
+
+  if (window.YT && window.YT.Player) {
+    ytPlayer = new YT.Player('ytIframePlayer', {
+      videoId: videoId,
+      width: '100%',
+      height: '100%',
+      playerVars: {
+        autoplay: 1,
+        rel: 0,
+        modestbranding: 1
+      },
+      events: {
+        onReady: (e) => {
+          e.target.playVideo();
+          updateMiniPlayState();
+        },
+        onStateChange: onPlayerStateChange,
+        onError: onPlayerError
+      }
+    });
+  } else {
+    container.innerHTML = `
+      <iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0"
+              frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen>
+      </iframe>`;
+  }
+}
+
+/* ── Autoplay Toggle ── */
+function toggleAutoplay() {
+  autoplayEnabled = !autoplayEnabled;
+  const dot = document.getElementById('autoplayDot');
+  const label = document.getElementById('autoplayLabel');
+  if (autoplayEnabled) {
+    dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+    label.textContent = 'Autoplay Next On';
+    toast('Autoplay enabled');
+  } else {
+    dot.className = 'w-2 h-2 rounded-full bg-gray-500';
+    label.textContent = 'Autoplay Next Off';
+    toast('Autoplay disabled — will stay on current video');
+  }
+}
+
+/* ── Player State & End-of-Video ── */
+function onPlayerStateChange(event) {
+  if (event.data === 1) {
+    consecutiveErrors = 0; // reset errors on successful playback
+  }
+  updateMiniPlayState();
+
+  // YT.PlayerState.ENDED is 0
+  if (event.data === 0) {
+    if (autoplayEnabled) {
+      playNextVideo();
+    } else {
+      updateMiniPlayState();
+    }
+  }
+}
+
+/* ── Error Handling ("Video unavailable" fallback to next) ── */
+function onPlayerError(event) {
+  console.warn('YouTube player error:', event.data, 'for video:', activeVideo ? activeVideo.id : '');
+  consecutiveErrors++;
+
+  if (consecutiveErrors > 4) {
+    toast('⚠️ Multiple videos restricted by YouTube. Pausing autoplay.');
+    consecutiveErrors = 0;
+    return;
+  }
+
+  // Remove the failing video from queue
+  if (activeVideo) {
+    upcomingQueue = upcomingQueue.filter(v => v.id !== activeVideo.id);
+    renderSuggestions();
+  }
+
+  toast('⚠️ Video unavailable for embed. Auto-skipping to next media…');
+
+  setTimeout(() => {
+    playNextVideo(true);
+  }, 1000);
+}
+
+function playNextVideo(forced = false) {
+  if (!autoplayEnabled && !forced) return;
+
+  if (!upcomingQueue.length) {
+    // If we exhausted every new suggestion, allow previously played ones (except active)
+    const fallback = currentVideos.filter(v => v.id !== (activeVideo ? activeVideo.id : ''));
+    if (fallback.length) {
+      sessionPlayed.clear();
+      if (activeVideo) sessionPlayed.add(activeVideo.id);
+      upcomingQueue = fallback;
+    }
+  }
+
+  if (!upcomingQueue.length) {
+    toast('End of suggestions queue');
+    return;
+  }
+
+  // Progress to the next distinct song in the queue
+  const nextVideo = upcomingQueue.shift();
+  toast(`▶ Playing next: ${nextVideo.title.slice(0, 42)}…`);
+  openWatch(nextVideo, false);
+}
+
+async function fetchRelatedVideos(video) {
+  try {
+    const res = await fetch('/related', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({video_id: video.id, title: video.title, limit: 10})
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.results && data.results.length) {
+      const existingIds = new Set(upcomingQueue.map(v => v.id));
+      existingIds.add(activeVideo ? activeVideo.id : '');
+
+      // Append only distinct videos that have not yet been played in this session
+      const freshItems = data.results.filter(v => !sessionPlayed.has(v.id) && !existingIds.has(v.id));
+      if (freshItems.length) {
+        upcomingQueue = [...upcomingQueue, ...freshItems];
+        renderSuggestions();
+      }
+    }
+  } catch (e) {
+    console.warn('Failed fetching related videos', e);
+  }
+}
+
+function renderSuggestions() {
+  const list = document.getElementById('suggestList');
+  document.getElementById('suggestCount').textContent = `(${upcomingQueue.length})`;
+  list.innerHTML = '';
+
+  if (!upcomingQueue.length) {
+    list.innerHTML = `<p class="text-xs text-gray-500 py-4 text-center">No more upcoming songs in queue</p>`;
+    return;
+  }
+
+  upcomingQueue.forEach((v) => {
+    const row = document.createElement('div');
+    row.className = 'suggest-item';
+
+    const fallbackSrc = `https://i.ytimg.com/vi/${h(v.id)}/hqdefault.jpg`;
+    const thumbSrc = v.thumbnail || fallbackSrc;
+
+    row.innerHTML = `
+      <div class="relative w-28 sm:w-32 aspect-video rounded-lg overflow-hidden bg-[#202020] shrink-0">
+        <img src="${h(thumbSrc)}" alt="" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null;this.src='${fallbackSrc}'"/>
+        ${v.duration ? `<span class="dur-badge" style="bottom:4px;right:4px;font-size:10px">${h(v.duration)}</span>` : ''}
+      </div>
+      <div class="flex-1 min-w-0 flex flex-col justify-center">
+        <h4 class="text-xs sm:text-sm font-medium text-white line-clamp-2 leading-snug mb-1">${h(v.title)}</h4>
+        <p class="text-[11px] text-gray-400 truncate">${h(v.channel)}</p>
+        <p class="text-[11px] text-gray-500">${h(v.view_count)}</p>
+      </div>`;
+
+    row.addEventListener('click', () => {
+      openWatch(v, false);
+    });
+
+    list.appendChild(row);
+  });
+}
+
+/* ═══════════════════════════ DRAGGABLE MINI-PLAYER HUD ═══════════════════════════ */
+let isDraggingMini = false;
+let miniDragMoved = false;
+let miniStartX = 0;
+let miniStartY = 0;
+let miniInitialLeft = 0;
+let miniInitialTop = 0;
+let savedMiniPos = null;
+
+function initMiniDrag() {
+  const modal = document.getElementById('watch-modal');
+  if (!modal) return;
+
+  modal.addEventListener('pointerdown', (e) => {
+    // Only allow drag when in mini mode
+    if (watchState !== 'mini') return;
+
+    // Do NOT drag if clicking on interactive buttons (play/pause, expand, close)
+    if (e.target.closest('button')) return;
+
+    // Only handle primary button (left mouse click or touch)
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+    const rect = modal.getBoundingClientRect();
+    miniStartX = e.clientX;
+    miniStartY = e.clientY;
+    miniInitialLeft = rect.left;
+    miniInitialTop = rect.top;
+    isDraggingMini = true;
+    miniDragMoved = false;
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!isDraggingMini || watchState !== 'mini') return;
+
+    const dx = e.clientX - miniStartX;
+    const dy = e.clientY - miniStartY;
+
+    if (!miniDragMoved && Math.hypot(dx, dy) > 5) {
+      miniDragMoved = true;
+      modal.setPointerCapture(e.pointerId);
+      modal.style.transition = 'none';
+      modal.classList.add('cursor-grabbing', 'shadow-[0_20px_50px_rgba(255,0,0,0.3)]');
+      document.body.style.userSelect = 'none';
+    }
+
+    if (miniDragMoved) {
+      const modalW = modal.offsetWidth || 340;
+      const modalH = modal.offsetHeight || 75;
+      const minX = 8;
+      const maxX = Math.max(minX, window.innerWidth - modalW - 8);
+      const minY = 60; // Keep below 56px sticky top navbar
+      const maxY = Math.max(minY, window.innerHeight - modalH - 8);
+
+      const targetX = Math.min(Math.max(miniInitialLeft + dx, minX), maxX);
+      const targetY = Math.min(Math.max(miniInitialTop + dy, minY), maxY);
+
+      modal.style.left = `${targetX}px`;
+      modal.style.top = `${targetY}px`;
+      modal.style.bottom = 'auto';
+      modal.style.right = 'auto';
+
+      savedMiniPos = { left: targetX, top: targetY };
+    }
+  });
+
+  const endDrag = (e) => {
+    if (!isDraggingMini) return;
+    isDraggingMini = false;
+
+    if (modal.hasPointerCapture && modal.hasPointerCapture(e.pointerId)) {
+      try { modal.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+
+    modal.style.transition = '';
+    modal.classList.remove('cursor-grabbing', 'shadow-[0_20px_50px_rgba(255,0,0,0.3)]');
+    document.body.style.userSelect = '';
+
+    if (miniDragMoved) {
+      clampMiniPlayerPosition();
+    }
+  };
+
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+
+  // Prevent click-to-expand from triggering if the user was dragging
+  modal.addEventListener('click', (e) => {
+    if (watchState === 'mini' && miniDragMoved) {
+      e.stopPropagation();
+      e.preventDefault();
+      miniDragMoved = false;
+    }
+  }, true);
+
+  // Re-clamp position on window resize so it never goes off-screen
+  window.addEventListener('resize', () => {
+    if (watchState === 'mini') {
+      clampMiniPlayerPosition();
+    }
+  });
+}
+
+function clampMiniPlayerPosition() {
+  const modal = document.getElementById('watch-modal');
+  if (!modal || watchState !== 'mini' || !savedMiniPos) return;
+
+  const modalW = modal.offsetWidth || 340;
+  const modalH = modal.offsetHeight || 75;
+  const minX = 8;
+  const maxX = Math.max(minX, window.innerWidth - modalW - 8);
+  const minY = 60;
+  const maxY = Math.max(minY, window.innerHeight - modalH - 8);
+
+  const clampedX = Math.min(Math.max(savedMiniPos.left, minX), maxX);
+  const clampedY = Math.min(Math.max(savedMiniPos.top, minY), maxY);
+
+  savedMiniPos = { left: clampedX, top: clampedY };
+  modal.style.left = `${clampedX}px`;
+  modal.style.top = `${clampedY}px`;
+  modal.style.bottom = 'auto';
+  modal.style.right = 'auto';
+}
+
+/* ── Seamless Mini-Player Transitions (Keeps Iframe & Audio Intact) ── */
+function minimizeWatch(e) {
+  if (e) e.stopPropagation();
+  if (!activeVideo) return;
+  watchState = 'mini';
+
+  const modal = document.getElementById('watch-modal');
+  const fullTopbar = document.getElementById('watch-full-topbar');
+  const mainBody = document.getElementById('watch-main-body');
+  const layoutGrid = document.getElementById('watch-layout-grid');
+  const playerCol = document.getElementById('watch-player-col');
+  const playerAndMiniRow = document.getElementById('player-and-mini-row');
+  const playerDock = document.getElementById('player-dock');
+  const miniOverlay = document.getElementById('mini-expand-overlay');
+  const miniBar = document.getElementById('mini-player-bar');
+  const fullMeta = document.getElementById('watch-full-meta-section');
+  const fullSuggs = document.getElementById('watch-full-suggestions-col');
+
+  if (activeVideo) {
+    document.getElementById('miniTitle').textContent = activeVideo.title;
+    document.getElementById('miniChannel').textContent = activeVideo.channel || 'YouTube';
+  }
+
+  // Restore background scrolling so Downloads/Search view can be scrolled
+  document.body.style.overflow = '';
+
+  // Transform modal to docked mini-player (draggable HUD)
+  modal.className = 'fixed z-50 w-[calc(100vw-1.5rem)] sm:w-[440px] max-w-[440px] bg-[#181818]/95 backdrop-blur-md border border-[#383838] rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] p-2.5 flex flex-row items-center transition-shadow duration-200 select-none touch-none cursor-grab hud-docked';
+
+  if (savedMiniPos) {
+    clampMiniPlayerPosition();
+  } else {
+    // Default position: bottom-right (24px on desktop, 12px on mobile)
+    const margin = window.innerWidth >= 640 ? 24 : 12;
+    modal.style.top = 'auto';
+    modal.style.left = 'auto';
+    modal.style.right = `${margin}px`;
+    modal.style.bottom = `${margin}px`;
+  }
+
+  fullTopbar.classList.add('hidden');
+  mainBody.className = 'w-full';
+  layoutGrid.className = 'w-full block p-0';
+  playerCol.className = 'w-full block';
+  playerAndMiniRow.className = 'flex items-center gap-3 w-full';
+  playerDock.className = 'relative w-28 sm:w-36 aspect-video rounded-lg overflow-hidden shrink-0 bg-black shadow cursor-pointer group';
+  miniOverlay.classList.remove('hidden');
+  miniBar.classList.remove('hidden');
+  fullMeta.classList.add('hidden');
+  fullSuggs.classList.add('hidden');
+
+  updateMiniPlayState();
+}
+
+function expandWatch(e) {
+  if (e) e.stopPropagation();
+  if (!activeVideo) return;
+  watchState = 'full';
+
+  const modal = document.getElementById('watch-modal');
+  modal.classList.remove('hidden');
+
+  // Clear draggable positioning overrides so modal is true full-screen
+  modal.style.left = '';
+  modal.style.top = '';
+  modal.style.bottom = '';
+  modal.style.right = '';
+  modal.style.transition = '';
+
+  const fullTopbar = document.getElementById('watch-full-topbar');
+  const mainBody = document.getElementById('watch-main-body');
+  const layoutGrid = document.getElementById('watch-layout-grid');
+  const playerCol = document.getElementById('watch-player-col');
+  const playerAndMiniRow = document.getElementById('player-and-mini-row');
+  const playerDock = document.getElementById('player-dock');
+  const miniOverlay = document.getElementById('mini-expand-overlay');
+  const miniBar = document.getElementById('mini-player-bar');
+  const fullMeta = document.getElementById('watch-full-meta-section');
+  const fullSuggs = document.getElementById('watch-full-suggestions-col');
+
+  // Lock body scroll in full view
+  document.body.style.overflow = 'hidden';
+
+  // Switch modal classes back to full screen
+  modal.className = 'fixed inset-0 z-50 bg-[#0f0f0f] flex flex-col overflow-hidden';
+
+  fullTopbar.classList.remove('hidden');
+  mainBody.className = 'flex-1 overflow-y-auto';
+  layoutGrid.className = 'max-w-[1600px] mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6';
+  playerCol.className = 'lg:col-span-8 flex flex-col gap-4';
+  playerAndMiniRow.className = 'w-full relative';
+  playerDock.className = 'relative w-full aspect-video rounded-xl overflow-hidden bg-black shadow-2xl';
+  miniOverlay.classList.add('hidden');
+  miniBar.classList.add('hidden');
+  fullMeta.classList.remove('hidden');
+  fullSuggs.classList.remove('hidden');
+}
+
+function goToDownloadsFromPlayer() {
+  minimizeWatch();
+  switchView('downloads');
+}
+
+function closeWatch(e) {
+  if (e) e.stopPropagation();
+  watchState = 'closed';
+
+  const modal = document.getElementById('watch-modal');
+  modal.classList.add('hidden');
+  modal.style.left = '';
+  modal.style.top = '';
+  modal.style.bottom = '';
+  modal.style.right = '';
+  modal.style.transition = '';
+  savedMiniPos = null;
+  modal.className = 'hidden fixed inset-0 z-50 bg-[#0f0f0f] flex flex-col overflow-hidden';
+  document.body.style.overflow = '';
+
+  if (ytPlayer && ytPlayer.stopVideo) {
+    try { ytPlayer.stopVideo(); } catch(e) {}
+  }
+  document.getElementById('ytPlayerContainer').innerHTML = '';
+  activeVideo = null;
+}
+
+function updateMiniPlayState() {
+  const iconPause = document.getElementById('miniIconPause');
+  const iconPlay = document.getElementById('miniIconPlay');
+  const dot = document.getElementById('miniStateDot');
+  const txt = document.getElementById('miniStateText');
+  if (!iconPause || !iconPlay) return;
+
+  let isPlaying = false;
+  if (ytPlayer && ytPlayer.getPlayerState) {
+    try {
+      isPlaying = (ytPlayer.getPlayerState() === 1); // 1 = YT.PlayerState.PLAYING
+    } catch(e) {}
+  }
+
+  if (isPlaying) {
+    iconPause.classList.remove('hidden');
+    iconPlay.classList.add('hidden');
+    if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
+    if (txt) {
+      txt.textContent = 'Playing audio';
+      txt.className = 'text-[10px] text-emerald-400 font-medium';
+    }
+  } else {
+    iconPause.classList.add('hidden');
+    iconPlay.classList.remove('hidden');
+    if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-gray-500';
+    if (txt) {
+      txt.textContent = 'Paused';
+      txt.className = 'text-[10px] text-gray-400 font-medium';
+    }
+  }
+}
+
+function toggleMiniPlayPause(e) {
+  if (e) e.stopPropagation();
+  if (!ytPlayer || !ytPlayer.getPlayerState) return;
+
+  try {
+    const st = ytPlayer.getPlayerState();
+    if (st === 1) {
+      ytPlayer.pauseVideo();
+    } else {
+      ytPlayer.playVideo();
+    }
+    setTimeout(updateMiniPlayState, 200);
+  } catch(err) {
+    console.warn('toggleMiniPlayPause error', err);
+  }
+}
+
+/* ── Watch Modal Format Switch (Animated Red Pill) ── */
+function wFmt(fmt) {
+  watchFmt = fmt;
+  const thumb = document.getElementById('wThumb');
+  const btnVid = document.getElementById('wTabVid');
+  const btnAud = document.getElementById('wTabAud');
+  const sel = document.getElementById('wQuality');
+
+  if (fmt === 'video') {
+    thumb.style.transform = 'translateX(0)';
+    btnVid.className = 'relative z-10 flex-1 h-full flex items-center justify-center gap-1 text-[11px] sm:text-xs font-semibold text-white transition-colors cursor-pointer';
+    btnAud.className = 'relative z-10 flex-1 h-full flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors cursor-pointer';
+    sel.innerHTML = '<option value="1080p">1080p</option><option value="720p" selected>720p</option><option value="480p">480p</option><option value="360p">360p</option>';
+  } else {
+    thumb.style.transform = 'translateX(100%)';
+    btnVid.className = 'relative z-10 flex-1 h-full flex items-center justify-center gap-1 text-[11px] sm:text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors cursor-pointer';
+    btnAud.className = 'relative z-10 flex-1 h-full flex items-center justify-center gap-1 text-[11px] sm:text-xs font-semibold text-white transition-colors cursor-pointer';
+    sel.innerHTML = '<option value="320kbps">320k</option><option value="192kbps" selected>192k</option><option value="128kbps">128k</option>';
+  }
+}
+
+async function doWatchDownload() {
+  if (!activeVideo) return;
+  const quality = document.getElementById('wQuality').value;
+  const btnText = document.getElementById('wDlBtnText');
+  if (btnText) btnText.textContent = 'Adding…';
+
+  try {
+    const res = await fetch('/download', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        url: activeVideo.url,
+        format: watchFmt,
+        quality: quality,
+        title: activeVideo.title,
+        thumbnail: activeVideo.thumbnail
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data.job) {
+      jobsState[data.job.id] = data.job;
+      updateDlBadges();
+    }
+
+    if (btnText) btnText.textContent = '✓ Added';
+    setTimeout(() => {
+      if (btnText) btnText.textContent = 'Download';
+    }, 2500);
+
+    // Seamlessly minimize watch player into floating mini-player & navigate to Downloads page!
+    minimizeWatch();
+    switchView('downloads');
+    toast('▶ Download queued! Switched to Downloads page (audio playing in background)');
+
+  } catch (err) {
+    if (btnText) btnText.textContent = 'Download';
+    toast('Download error: ' + err.message);
+  }
+}
+
+/* ── Quick Download Modal Format Switch (Animated Red Pill) ── */
+function openPanel(v) {
+  panelVideo = v;
+  document.getElementById('dlpThumb').src = v.thumbnail || `https://i.ytimg.com/vi/${h(v.id)}/hqdefault.jpg`;
+  document.getElementById('dlpName').textContent = v.title || '';
+  pFmt('video');
+  const p = document.getElementById('dl-panel');
+  p.classList.remove('hidden');
+  p.classList.add('flex');
+}
+
+function closePanel() {
+  const p = document.getElementById('dl-panel');
+  p.classList.add('hidden');
+  p.classList.remove('flex');
+  panelVideo = null;
+}
+
+document.getElementById('dl-panel').addEventListener('click', function(e) {
+  if (e.target === this) closePanel();
+});
+
+function pFmt(fmt) {
+  panelFmt = fmt;
+  const thumb = document.getElementById('pThumb');
+  const btnVid = document.getElementById('pTabVid');
+  const btnAud = document.getElementById('pTabAud');
+  const sel = document.getElementById('pQuality');
+
+  if (fmt === 'video') {
+    thumb.style.transform = 'translateX(0)';
+    btnVid.className = 'relative z-10 flex-1 h-full flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-white transition-colors duration-200 cursor-pointer';
+    btnAud.className = 'relative z-10 flex-1 h-full flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors duration-200 cursor-pointer';
+    sel.innerHTML = '<option value="1080p">1080p – Full HD</option><option value="720p" selected>720p – HD</option><option value="480p">480p – SD</option><option value="360p">360p – Low</option>';
+  } else {
+    thumb.style.transform = 'translateX(100%)';
+    btnVid.className = 'relative z-10 flex-1 h-full flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors duration-200 cursor-pointer';
+    btnAud.className = 'relative z-10 flex-1 h-full flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-white transition-colors duration-200 cursor-pointer';
+    sel.innerHTML = '<option value="320kbps">320 kbps – Best MP3</option><option value="192kbps" selected>192 kbps – High MP3</option><option value="128kbps">128 kbps – Standard MP3</option>';
+  }
+}
+
+async function doPanelDownload() {
+  if (!panelVideo) return;
+  const quality = document.getElementById('pQuality').value;
+  closePanel();
+  await startDownload(panelVideo, panelFmt, quality);
+}
+
+/* ═══════════════════════════ DOWNLOAD API & REAL-TIME WEBSOCKET ═══════════════════════════ */
+async function startDownload(video, fmt, quality) {
+  try {
+    const res = await fetch('/download', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        url: video.url,
+        format: fmt,
+        quality: quality,
+        title: video.title,
+        thumbnail: video.thumbnail
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data.job) {
+      jobsState[data.job.id] = data.job;
+      updateDlBadges();
+      if (currentView === 'downloads') renderDownloads();
+    }
+    highlightHeaderDl();
+    toast('✓ Added to downloads queue!', 'View Downloads', () => switchView('downloads'));
+  } catch (err) {
+    toast('Download error: ' + err.message);
+  }
+}
+
+function getSafeDownloadName(job) {
+  const clean = (job.title || 'download').replace(/[\\/*?:"<>|]/g, '').trim() || 'download';
+  const ext = job.format === 'audio' ? '.mp3' : '.mp4';
+  return clean.slice(0, 160) + ext;
+}
+
+function renderDownloads() {
+  const list = document.getElementById('jobs-list');
+  const emptyState = document.getElementById('dl-empty-state');
+  const clearBtn = document.getElementById('clear-btn');
+  const jobArr = Object.values(jobsState).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (!jobArr.length) {
+    list.innerHTML = '';
+    emptyState.classList.remove('hidden');
+    emptyState.classList.add('flex');
+    clearBtn.classList.add('hidden');
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+  emptyState.classList.remove('flex');
+  list.innerHTML = '';
+
+  jobArr.forEach(job => {
+    list.appendChild(buildJobElement(job));
+  });
+
+  const hasFinished = jobArr.some(j => j.status === 'complete' || j.status === 'error');
+  if (hasFinished) clearBtn.classList.remove('hidden');
+  else clearBtn.classList.add('hidden');
+  updateDlBadges();
+}
+
+function updateDlBadges() {
+  const activeCount = Object.values(jobsState).filter(j => j.status === 'downloading' || j.status === 'processing' || j.status === 'queued').length;
+  const navBadge = document.getElementById('navDlBadge');
+  const wmBadge = document.getElementById('wmDlBadge');
+
+  [navBadge, wmBadge].forEach(b => {
+    if (!b) return;
+    if (activeCount > 0) {
+      b.textContent = activeCount;
+      b.classList.remove('hidden');
+    } else {
+      b.classList.add('hidden');
+    }
+  });
+}
+
+function buildJobElement(job) {
+  const el = document.createElement('div');
+  el.id = `job-${job.id}`;
+  el.className = 'job-item bg-[#181818] border border-[#272727] rounded-xl p-3 sm:p-4';
+
+  const statusColor = {
+    queued: 'text-gray-400',
+    downloading: 'text-blue-400',
+    processing: 'text-yellow-400',
+    complete: 'text-emerald-400',
+    error: 'text-red-400'
+  }[job.status] || 'text-gray-400';
+
+  const statusLabel = {
+    queued: 'Queued',
+    downloading: 'Downloading',
+    processing: 'Processing…',
+    complete: 'Complete',
+    error: 'Error'
+  }[job.status] || job.status;
+
+  const fmtBadge = `${job.format === 'audio' ? '🎵' : '🎬'} ${job.format} · ${job.quality}`;
+  const progress = Math.min(100, Math.max(0, job.progress || 0));
+
+  let rightSection = '';
+  if (job.status === 'downloading') {
+    rightSection = `
+      <div class="text-right shrink-0">
+        <p class="text-xs sm:text-sm font-semibold text-white">${progress.toFixed(1)}%</p>
+        <p class="text-[11px] text-blue-400 font-medium">${h(job.speed || '—')}</p>
+        <p class="text-[11px] text-gray-500">ETA ${h(job.eta || '—')}</p>
+      </div>`;
+  } else if (job.status === 'complete') {
+    rightSection = `
+      <div class="text-right shrink-0 flex items-center gap-2">
+        ${job.file_size ? `<span class="text-xs text-gray-400">${h(job.file_size)}</span>` : ''}
+        <a href="/files/${h(job.id)}" download="${h(getSafeDownloadName(job))}"
+          class="inline-flex items-center gap-1.5 bg-[#ff0000] hover:bg-[#cc0000] px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+          title="Save downloaded file to device" aria-label="Save file">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          Save file
+        </a>
+      </div>`;
+  } else if (job.status === 'error') {
+    rightSection = `
+      <div class="text-right shrink-0 max-w-[180px]">
+        <p class="text-[11px] text-red-400 leading-tight">${h((job.error || 'Error').slice(0, 100))}</p>
+      </div>`;
+  } else if (job.status === 'processing') {
+    rightSection = `
+      <div class="text-right shrink-0">
+        <p class="text-xs text-yellow-400 animate-pulse">Processing…</p>
+      </div>`;
+  } else {
+    rightSection = `
+      <div class="text-right shrink-0">
+        <p class="text-xs text-gray-500">Queued</p>
+      </div>`;
+  }
+
+  let barColor = '#3b82f6';
+  if (job.status === 'complete') barColor = '#10b981';
+  if (job.status === 'error') barColor = '#ef4444';
+  if (job.status === 'processing') barColor = '#eab308';
+
+  el.innerHTML = `
+    <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+      <div class="flex gap-3 flex-1 min-w-0 items-start">
+        <div class="shrink-0 w-24 sm:w-28 aspect-video rounded-lg overflow-hidden bg-[#272727]">
+          ${job.thumbnail
+            ? `<img src="${h(job.thumbnail)}" alt="" class="w-full h-full object-cover" />`
+            : `<div class="w-full h-full flex items-center justify-center text-gray-600">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+                </svg>
+              </div>`
+          }
+        </div>
+        <div class="flex-1 min-w-0 space-y-1.5">
+          <p class="text-xs sm:text-sm font-semibold text-white leading-snug line-clamp-2">${h(job.title)}</p>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-[11px] bg-[#272727] text-gray-300 px-2 py-0.5 rounded-full">${h(fmtBadge)}</span>
+            <span class="text-[11px] ${statusColor} font-medium">${statusLabel}</span>
+          </div>
+          <div class="w-full bg-[#272727] rounded-full h-1.5 overflow-hidden">
+            <div class="progress-bar h-full rounded-full" style="width:${progress}%;background:${barColor}"></div>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#252525]">
+        ${rightSection}
+        <button onclick="removeJob('${h(job.id)}')" class="p-2 text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-[#272727] cursor-pointer" title="Remove download from history" aria-label="Remove download">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>`;
+
+  return el;
+}
+
+function updateJobDom(jobId) {
+  const el = document.getElementById(`job-${jobId}`);
+  if (!el) {
+    renderDownloads();
+    return;
+  }
+  const job = jobsState[jobId];
+  if (job) {
+    const parent = el.parentNode;
+    const newEl = buildJobElement(job);
+    parent.replaceChild(newEl, el);
+    updateDlBadges();
+  }
+}
+
+async function removeJob(jobId) {
+  try {
+    await fetch(`/jobs/${jobId}`, { method: 'DELETE' });
+    delete jobsState[jobId];
+    renderDownloads();
+  } catch (err) {
+    console.error('Remove failed', err);
+  }
+}
+
+async function clearCompleted() {
+  const done = Object.values(jobsState).filter(j => j.status === 'complete' || j.status === 'error');
+  for (const job of done) {
+    await removeJob(job.id);
+  }
+}
+
+/* ── Fetch Jobs REST Fallback ── */
+async function fetchJobs() {
+  try {
+    const res = await fetch('/jobs');
+    if (!res.ok) return;
+    const data = await res.json();
+    (data.jobs || []).forEach(j => { jobsState[j.id] = j; });
+    updateDlBadges();
+    if (currentView === 'downloads') renderDownloads();
+  } catch (err) {
+    console.warn('fetchJobs error', err);
+  }
+}
+
+/* ── WebSocket Setup for Live Progress ── */
+function connectWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${window.location.host}/ws`);
+
+  ws.addEventListener('open', () => {
+    document.getElementById('live-dot').className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+    document.getElementById('ws-status').textContent = 'Live';
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  });
+
+  ws.addEventListener('message', (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'snapshot') {
+        (msg.jobs || []).forEach(j => { jobsState[j.id] = j; });
+        updateDlBadges();
+        if (currentView === 'downloads') renderDownloads();
+      } else if (msg.type === 'new_job') {
+        if (msg.job) {
+          jobsState[msg.job.id] = msg.job;
+          updateDlBadges();
+          if (currentView === 'downloads') renderDownloads();
+        }
+      } else if (msg.type === 'progress') {
+        if (!jobsState[msg.job_id]) {
+          jobsState[msg.job_id] = { id: msg.job_id, status: msg.status, progress: msg.progress };
+        }
+        Object.assign(jobsState[msg.job_id], {
+          status: msg.status,
+          progress: msg.progress,
+          speed: msg.speed,
+          eta: msg.eta
+        });
+        updateJobDom(msg.job_id);
+      } else if (msg.type === 'complete') {
+        if (!jobsState[msg.job_id]) {
+          jobsState[msg.job_id] = { id: msg.job_id };
+        }
+        Object.assign(jobsState[msg.job_id], {
+          status: 'complete',
+          progress: 100,
+          filename: msg.filename,
+          file_size: msg.file_size
+        });
+        updateJobDom(msg.job_id);
+        updateDlBadges();
+      } else if (msg.type === 'error') {
+        if (!jobsState[msg.job_id]) {
+          jobsState[msg.job_id] = { id: msg.job_id };
+        }
+        Object.assign(jobsState[msg.job_id], { status: 'error', error: msg.error });
+        updateJobDom(msg.job_id);
+        updateDlBadges();
+      }
+    } catch (err) {}
+  });
+
+  ws.addEventListener('close', () => {
+    document.getElementById('live-dot').className = 'w-2 h-2 rounded-full bg-gray-500';
+    document.getElementById('ws-status').textContent = 'Reconnecting…';
+    reconnectTimer = setTimeout(connectWebSocket, 3000);
+  });
+
+  ws.addEventListener('error', () => {
+    try { ws.close(); } catch(e){}
+  });
+
+  setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send('ping');
+  }, 20000);
+}
+
+/* ═══════════════════════════ TOAST ═══════════════════════════ */
+let toastTimer;
+function toast(msg, actionText = null, actionCallback = null) {
+  const el = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  const actionBtn = document.getElementById('toastAction');
+
+  if (watchState === 'mini') {
+    el.style.bottom = '84px';
+  } else {
+    el.style.bottom = '20px';
+  }
+
+  if (actionText && actionCallback) {
+    actionBtn.textContent = actionText;
+    actionBtn.classList.remove('hidden');
+    actionBtn.onclick = (e) => {
+      e.stopPropagation();
+      el.classList.remove('show');
+      actionCallback();
+    };
+  } else {
+    actionBtn.classList.add('hidden');
+    actionBtn.onclick = null;
+  }
+
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+/* ═══════════════════════════ ESCAPE KEY ═══════════════════════════ */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (watchState === 'full') {
+      minimizeWatch();
+    } else if (watchState === 'mini') {
+      closeWatch();
+    }
+    closePanel();
+  }
+});
+
+/* ── Init Application ── */
+initDlAccordion();
+initMiniDrag();
+checkSystemStatus();
+fetchJobs();
+connectWebSocket();
+
+// Detect initial route
+if (location.pathname === '/downloads-page') {
+  switchView('downloads', false);
+} else {
+  switchView('search', false);
+}
+</script>
+</body>
+</html>
