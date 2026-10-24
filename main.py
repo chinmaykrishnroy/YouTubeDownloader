@@ -6,10 +6,13 @@ import uuid
 import secrets
 import tempfile
 import time
+import json
+import signal
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 
 import aiofiles
 import yt_dlp
@@ -19,7 +22,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import urllib.parse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 BASE_DIR = Path(__file__).parent
 
@@ -75,6 +78,8 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8000"))
 RELOAD = os.environ.get("RELOAD", "false").lower() in ("true", "1", "yes")
 MAX_CONCURRENT_DOWNLOADS = int(os.environ.get("MAX_CONCURRENT_DOWNLOADS", 4))
+if MAX_CONCURRENT_DOWNLOADS < 1:
+    raise ValueError("MAX_CONCURRENT_DOWNLOADS must be at least 1")
 DOWNLOAD_SEMAPHORE: Optional[asyncio.Semaphore] = None
 CLEANUP_TTL_SECONDS = int(os.environ.get("CLEANUP_TTL_SECONDS", 1800))  # 30 mins file retention
 FILE_POST_DOWNLOAD_CLEANUP_SECONDS = int(os.environ.get("FILE_POST_DOWNLOAD_CLEANUP_SECONDS", 90))  # Auto-clean 90s after user starts saving file
@@ -97,9 +102,13 @@ if PUBLIC_ORIGIN:
 SESSION_COOKIE = "yt_session"
 SESSION_DISCONNECT_GRACE_SECONDS = 15
 SESSION_IDLE_SECONDS = 90
+DOWNLOAD_TIMEOUT_SECONDS = int(os.environ.get("DOWNLOAD_TIMEOUT_SECONDS", 1800))
+if DOWNLOAD_TIMEOUT_SECONDS < 1:
+    raise ValueError("DOWNLOAD_TIMEOUT_SECONDS must be at least 1")
 sessions: dict[str, dict] = {}
 connection_owners: dict[WebSocket, str] = {}
 worker_tasks: dict[str, asyncio.Task] = {}
+active_transfers: set[str] = set()
 
 
 def public_job(job: dict) -> dict:
@@ -129,6 +138,8 @@ def require_job(job_id: str, owner: str) -> dict:
 
 def remove_job_data(job_id: str):
     jobs.pop(job_id, None)
+    if job_id in active_transfers:
+        return
     # Includes partial media, fragments, and thumbnails. IDs are server-generated.
     for fp in DOWNLOADS_DIR.glob(f"{job_id}.*"):
         if fp.is_file():
@@ -142,8 +153,11 @@ async def expire_session(owner: str):
     sessions.pop(owner, None)
     for job_id, job in list(jobs.items()):
         if job.get("owner") == owner:
+            task = worker_tasks.get(job_id)
+            if task:
+                task.cancel()
             remove_job_data(job_id)
-            # Running threads finish cooperatively; they also clean in finally.
+            # Cancellation terminates the supervised download process.
 
 
 class PrivateFileResponse(FileResponse):
@@ -151,6 +165,7 @@ class PrivateFileResponse(FileResponse):
         try:
             await super().__call__(scope, receive, send)
         finally:
+            active_transfers.discard(self.job_id)
             remove_job_data(self.job_id)
             await broadcast({"type": "removed", "job_id": self.job_id}, owner=self.owner)
 
@@ -181,12 +196,19 @@ def clean_stale_files(max_age_seconds: int = CLEANUP_TTL_SECONDS) -> int:
         return 0
     now = datetime.now(timezone.utc).timestamp()
     removed_count = 0
+    protected_ids = active_transfers | {
+        job_id for job_id, job in list(jobs.items())
+        if job.get("status") in ("preparing", "downloading", "processing") or job.get("serving")
+    }
+
+    def is_protected(path):
+        return any(path.name.startswith(f"{job_id}.") for job_id in protected_ids)
 
     # 1. Clean orphaned partial/interrupted files (*.part, *.ytdl, *.tmp) older than 10 mins
     for pattern in ("*.part", "*.ytdl", "*.tmp", "*.temp"):
         for fp in DOWNLOADS_DIR.glob(pattern):
             try:
-                if (now - fp.stat().st_mtime) > 600:
+                if not is_protected(fp) and (now - fp.stat().st_mtime) > 600:
                     fp.unlink(missing_ok=True)
                     removed_count += 1
                     logger.info(f"[Auto-Clean] Removed stale partial file: {fp.name}")
@@ -203,9 +225,12 @@ def clean_stale_files(max_age_seconds: int = CLEANUP_TTL_SECONDS) -> int:
 
         age = now - created_ts
         is_completed_expired = status in ("complete", "error") and age > max_age_seconds
-        is_stuck = status in ("queued", "downloading", "processing") and age > max(max_age_seconds * 2, 3600)
+        is_stuck = status in ("queued", "preparing", "downloading", "processing") and age > max(max_age_seconds * 2, 3600)
 
-        if is_completed_expired or is_stuck:
+        if (is_completed_expired or is_stuck) and not job.get("serving"):
+            task = worker_tasks.get(job_id)
+            if task:
+                task.cancel()
             fn = job.get("filename")
             if fn:
                 fp = DOWNLOADS_DIR / fn
@@ -216,12 +241,12 @@ def clean_stale_files(max_age_seconds: int = CLEANUP_TTL_SECONDS) -> int:
                         logger.info(f"[Auto-Clean] TTL expired for job {job_id}: {fn}")
                     except Exception:
                         pass
-            jobs.pop(job_id, None)
+            remove_job_data(job_id)
 
     # 3. Clean files in DOWNLOADS_DIR not tracked by active jobs older than max_age_seconds
     active_filenames = {j.get("filename") for j in list(jobs.values()) if j.get("filename")}
     for fp in DOWNLOADS_DIR.iterdir():
-        if fp.is_file() and fp.name not in active_filenames:
+        if fp.is_file() and fp.name not in active_filenames and not is_protected(fp):
             try:
                 if (now - fp.stat().st_mtime) > max_age_seconds:
                     fp.unlink(missing_ok=True)
@@ -235,7 +260,7 @@ def clean_stale_files(max_age_seconds: int = CLEANUP_TTL_SECONDS) -> int:
         logger.warning(f"[Storage Quota] Cache {current_size / (1024*1024):.1f}MB exceeds limit. Purging oldest files...")
         file_list = []
         for fp in DOWNLOADS_DIR.iterdir():
-            if fp.is_file():
+            if fp.is_file() and not is_protected(fp):
                 try:
                     file_list.append((fp.stat().st_mtime, fp))
                 except Exception:
@@ -249,6 +274,9 @@ def clean_stale_files(max_age_seconds: int = CLEANUP_TTL_SECONDS) -> int:
                 fp.unlink(missing_ok=True)
                 current_size -= sz
                 removed_count += 1
+                for job_id, job in list(jobs.items()):
+                    if job.get("filename") == fp.name:
+                        remove_job_data(job_id)
                 logger.info(f"[Storage Quota] Purged: {fp.name}")
             except Exception:
                 pass
@@ -301,8 +329,14 @@ async def lifespan(app_instance: FastAPI):
     yield
     if cleanup_task and not cleanup_task.done():
         cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
     for owner in list(sessions):
         await expire_session(owner)
+    if worker_tasks:
+        await asyncio.gather(*list(worker_tasks.values()), return_exceptions=True)
     # Clean partial/interrupted files on shutdown
     for pattern in ("*.part", "*.ytdl", "*.tmp", "*.temp"):
         for fp in DOWNLOADS_DIR.glob(pattern):
@@ -369,19 +403,35 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
     limit: int = Field(default=10, ge=1, le=50)
 
+    @model_validator(mode="after")
+    def normalize_query(self):
+        self.query = self.query.strip()
+        if not self.query:
+            raise ValueError("Search query cannot be blank")
+        return self
+
 
 class RelatedRequest(BaseModel):
     video_id: str = Field(..., min_length=1, max_length=64)
-    title: str = ""
+    title: str = Field(default="", max_length=500)
     limit: int = Field(default=8, ge=1, le=20)
 
 
 class DownloadRequest(BaseModel):
-    url: str = Field(..., min_length=1)
-    format: str = "video"   # "video" | "audio"
-    quality: str = "720p"
-    title: str = ""
-    thumbnail: str = ""
+    url: str = Field(..., min_length=1, max_length=2048)
+    format: Literal["video", "audio"] = "video"
+    quality: Optional[str] = None
+    title: str = Field(default="", max_length=500)
+    thumbnail: str = Field(default="", max_length=2048)
+
+    @model_validator(mode="after")
+    def validate_quality(self):
+        allowed = {"audio": {"320kbps", "192kbps", "128kbps"}, "video": {"1080p", "720p", "480p", "360p"}}
+        if self.quality is None:
+            self.quality = "192kbps" if self.format == "audio" else "720p"
+        if self.quality not in allowed[self.format]:
+            raise ValueError("Unsupported quality for the selected format")
+        return self
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +439,7 @@ class DownloadRequest(BaseModel):
 # ---------------------------------------------------------------------------
 def sanitize_filename(name: str) -> str:
     """Remove characters that are unsafe in filenames or HTTP headers."""
-    name = re.sub(r'[\r\n\t\\/*?:"<>|]', "", name)
+    name = re.sub(r'[\x00-\x1f\x7f\\/*?:"<>|]', "", name)
     name = name.strip().strip(".")
     return name or "download"
 
@@ -400,9 +450,11 @@ def is_valid_youtube_url(url: str) -> bool:
         parsed = urllib.parse.urlparse(url.strip())
         if parsed.scheme not in ("http", "https"):
             return False
-        netloc = parsed.netloc.lower()
-        if ":" in netloc:
-            netloc = netloc.split(":", 1)[0]
+        if parsed.username or parsed.password:
+            return False
+        netloc = parsed.hostname
+        if parsed.port not in (None, 80, 443):
+            return False
         valid_hosts = {
             "youtube.com",
             "www.youtube.com",
@@ -451,10 +503,12 @@ async def broadcast(message: dict, owner: Optional[str] = None):
         if connection_owners.get(ws) != owner:
             continue
         try:
-            await ws.send_json(message)
+            await asyncio.wait_for(ws.send_json(message), timeout=5)
         except Exception:
             dead.add(ws)
     active_connections.difference_update(dead)
+    for ws in dead:
+        connection_owners.pop(ws, None)
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +532,8 @@ def _get_base_ydl_opts() -> dict:
     opts: dict = {
         "quiet": True,
         "no_warnings": True,
+        "socket_timeout": 15,
+        "extractor_retries": 2,
         "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         "http_headers": {
             "User-Agent": (
@@ -526,7 +582,7 @@ def search_youtube(query: str, limit: int = 10) -> list[dict]:
             return videos
     except Exception as exc:
         logger.warning(f"Search failed for '{query}': {exc}")
-        return []
+        raise RuntimeError("YouTube search is temporarily unavailable. Please try again.") from exc
 
 
 def get_ydl_format(fmt: str, quality: str, has_ffmpeg: bool) -> dict:
@@ -685,8 +741,8 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
         "outtmpl": outtmpl,
         "progress_hooks": [progress_hook],
         "noplaylist": True,
-        "retries": 5,
-        "fragment_retries": 5,
+        "retries": 2,
+        "fragment_retries": 2,
         "sleep_interval": 1,
         **ydl_extra,
     })
@@ -697,9 +753,9 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
         if fmt == "audio":
             # Embed album art thumbnail into the MP3
             meta_pp.append({"key": "EmbedThumbnail"})
-        # Prepend metadata postprocessors (format-specific ones were already added via ydl_extra)
+        # Convert to the final audio container before embedding tags and cover art.
         existing_pp = ydl_opts.get("postprocessors", [])
-        ydl_opts["postprocessors"] = meta_pp + existing_pp
+        ydl_opts["postprocessors"] = existing_pp + meta_pp
         ydl_opts["writethumbnail"] = fmt == "audio"   # download thumb only for audio embed
 
     try:
@@ -713,7 +769,7 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
                 prepared = ydl.prepare_filename(info)
                 stem = Path(prepared).stem   # e.g. "3f70..." (the job_id)
                 for f in DOWNLOADS_DIR.iterdir():
-                    if f.is_file() and f.stem == stem:
+                    if f.is_file() and f.stem == stem and f.suffix.lower() in (".mp3", ".m4a", ".mp4", ".webm", ".mkv", ".opus", ".ogg"):
                         filename = f.name
                         break
             if not filename:
@@ -724,14 +780,15 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
                     reverse=True,
                 )
                 # Exclude thumbnail files (.jpg/.webp written by writethumbnail)
-                candidates = [p for p in candidates if p.suffix.lower() not in (".jpg", ".jpeg", ".webp", ".png")]
+                candidates = [p for p in candidates if p.is_file() and p.suffix.lower() in (".mp3", ".m4a", ".mp4", ".webm", ".mkv", ".opus", ".ogg")]
                 filename = candidates[0].name if candidates else None
+            if not filename or not (DOWNLOADS_DIR / filename).is_file():
+                raise RuntimeError("Download finished without a media file. Please try again.")
 
             file_size = None
             if filename:
                 fp = DOWNLOADS_DIR / filename
                 if fp.exists():
-                    embed_metadata(fp, info or {}, thumbnail_url=jobs[job_id].get("thumbnail") or "")
                     size_bytes = fp.stat().st_size
                     if size_bytes >= 1_000_000:
                         file_size = f"{size_bytes / 1_000_000:.1f} MB"
@@ -773,6 +830,83 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
         )
 
     finally:
+        if job_id not in jobs:
+            remove_job_data(job_id)
+
+
+async def stop_download_process(process):
+    if process.returncode is not None:
+        return
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGTERM)
+        elif os.name == "nt":
+            killer = await asyncio.create_subprocess_exec(
+                "taskkill", "/PID", str(process.pid), "/T", "/F",
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )
+            await killer.wait()
+        else:
+            process.terminate()
+        await asyncio.wait_for(process.wait(), timeout=3)
+    except asyncio.TimeoutError:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        else:
+            process.kill()
+        await process.wait()
+    except ProcessLookupError:
+        await process.wait()
+
+
+async def run_download_process(job_id: str):
+    """Supervise yt-dlp and FFmpeg so cancelled jobs actually release their slot."""
+    job = jobs.get(job_id)
+    if job is None:
+        return
+    creation = asyncio.create_task(asyncio.create_subprocess_exec(
+        sys.executable, str(BASE_DIR / "scripts" / "download_worker.py"),
+        stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+        env={**os.environ, "DOWNLOADS_DIR_PATH": str(DOWNLOADS_DIR)},
+        start_new_session=(os.name == "posix"), limit=1024 * 1024,
+    ))
+    try:
+        process = await asyncio.shield(creation)
+    except asyncio.CancelledError:
+        # Cancellation during spawn must not leave an untracked media process.
+        process = await creation
+        await stop_download_process(process)
+        raise
+    try:
+        async with asyncio.timeout(DOWNLOAD_TIMEOUT_SECONDS):
+            process.stdin.write((json.dumps(job) + "\n").encode())
+            await process.stdin.drain()
+            process.stdin.close()
+            while line := await process.stdout.readline():
+                update = json.loads(line)
+                current = jobs.get(job_id)
+                if current is None:
+                    return
+                # Ownership stays in the parent; workers report only job state.
+                current.update({key: update[key] for key in (
+                    "status", "progress", "speed", "eta", "filename", "file_size", "error"
+                ) if key in update})
+                status = current["status"]
+                event_type = status if status in ("complete", "error") else "progress"
+                await broadcast({"type": event_type, "job_id": job_id, **{
+                    key: current.get(key) for key in (
+                        "status", "progress", "speed", "eta", "filename", "file_size", "error"
+                    )
+                }})
+            code = await process.wait()
+            if job_id in jobs and (code != 0 or jobs[job_id]["status"] not in ("complete", "error")):
+                raise RuntimeError("Media worker exited before finishing")
+    except TimeoutError:
+        if job_id in jobs:
+            jobs[job_id].update(status="error", error="Download timed out. Please try again.")
+            await broadcast({"type": "error", "job_id": job_id, "error": jobs[job_id]["error"]})
+    finally:
+        await stop_download_process(process)
         if job_id not in jobs:
             remove_job_data(job_id)
 
@@ -847,7 +981,10 @@ async def serve_downloads():
 @app.post("/search")
 async def search_endpoint(req: SearchRequest):
     loop = asyncio.get_running_loop()
-    results = await loop.run_in_executor(None, search_youtube, req.query, req.limit)
+    try:
+        results = await loop.run_in_executor(None, search_youtube, req.query, req.limit)
+    except Exception:
+        raise HTTPException(503, "YouTube search is temporarily unavailable. Please try again.")
     return {"results": results}
 
 
@@ -878,7 +1015,7 @@ async def start_download(req: DownloadRequest, owner: str = Depends(require_sess
     }
     jobs[job_id] = job
 
-    # Broadcast new job immediately to all active WebSocket connections
+    # Publish only to this browser session
     await broadcast({"type": "new_job", "job": public_job(job)}, owner=owner)
 
     loop = asyncio.get_running_loop()
@@ -888,16 +1025,19 @@ async def start_download(req: DownloadRequest, owner: str = Depends(require_sess
         if DOWNLOAD_SEMAPHORE is None:
             DOWNLOAD_SEMAPHORE = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
         async with DOWNLOAD_SEMAPHORE:
-            await loop.run_in_executor(
-                None,
-                run_download,
-                job_id,
-                req.url,
-                req.format,
-                req.quality,
-                req.title,
-                loop,
-            )
+            current_job = jobs.get(job_id)
+            if current_job is None:
+                return
+            current_job["status"] = "preparing"
+            logger.info("Download worker started for job %s (%s)", job_id, req.format)
+            await broadcast({"type": "progress", "job_id": job_id, "status": "preparing", "progress": 0, "speed": "", "eta": ""})
+            try:
+                await run_download_process(job_id)
+            except Exception:
+                logger.exception("Download worker failed for job %s", job_id)
+                if job_id in jobs:
+                    jobs[job_id].update(status="error", error="Download worker failed. Please try again.")
+                    await broadcast({"type": "error", "job_id": job_id, "error": jobs[job_id]["error"]})
 
     task = loop.create_task(_managed_worker())
     worker_tasks[job_id] = task
@@ -919,6 +1059,9 @@ async def get_job(job_id: str, owner: str = Depends(require_session)):
 @app.delete("/jobs/{job_id}")
 async def delete_job(job_id: str, owner: str = Depends(require_session)):
     require_job(job_id, owner)
+    task = worker_tasks.get(job_id)
+    if task:
+        task.cancel()
     remove_job_data(job_id)
     await broadcast({"type": "removed", "job_id": job_id}, owner=owner)
     return {"ok": True}
@@ -940,7 +1083,7 @@ async def serve_file(job_id: str, request: Request, owner: str = Depends(require
         raise HTTPException(status_code=400, detail="Invalid filename format")
 
     fp = (DOWNLOADS_DIR / fn).resolve()
-    if not str(fp).startswith(str(DOWNLOADS_DIR.resolve())):
+    if not fp.is_relative_to(DOWNLOADS_DIR.resolve()):
         raise HTTPException(status_code=403, detail="Access denied")
     if not fp.exists():
         raise HTTPException(status_code=404, detail="File has already been cleaned or removed")
@@ -952,6 +1095,7 @@ async def serve_file(job_id: str, request: Request, owner: str = Depends(require
 
     # FileResponse encodes Unicode filenames for Content-Disposition (RFC 5987).
     job["serving"] = True
+    active_transfers.add(job_id)
     response = PrivateFileResponse(
         path=str(fp),
         media_type="application/octet-stream",
@@ -992,7 +1136,9 @@ async def get_formats(video_id: str):
 
 async def _delayed_session_cleanup(owner: str):
     await asyncio.sleep(SESSION_DISCONNECT_GRACE_SECONDS)
-    if owner not in connection_owners.values():
+    session = sessions.get(owner)
+    if (session is not None and owner not in connection_owners.values()
+            and time.monotonic() - session["seen"] >= SESSION_DISCONNECT_GRACE_SECONDS):
         await expire_session(owner)
 
 

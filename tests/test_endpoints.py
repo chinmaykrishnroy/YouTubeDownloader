@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import unquote
+from unittest.mock import patch
 
 # Ensure project root is in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -169,7 +170,9 @@ class TestEndpoints(unittest.TestCase):
 
     def test_post_search(self):
         # Test real search endpoint with limit=2
-        resp = self.client.post("/search", json={"query": "NCS", "limit": 2})
+        with patch("main.search_youtube", return_value=[{"id": "example", "title": "Song", "url": "https://youtu.be/example"}]) as search:
+            resp = self.client.post("/search", json={"query": "NCS", "limit": 2})
+            search.assert_called_once_with("NCS", 2)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertIn("results", data)
@@ -179,6 +182,15 @@ class TestEndpoints(unittest.TestCase):
             self.assertIn("id", first)
             self.assertIn("title", first)
             self.assertIn("url", first)
+
+    def test_search_failure_has_an_error_status(self):
+        with patch("main.search_youtube", side_effect=RuntimeError("network unavailable")):
+            resp = self.client.post("/search", json={"query": "Song"})
+        self.assertEqual(resp.status_code, 503)
+        self.assertIn("temporarily unavailable", resp.json()["detail"])
+
+    def test_blank_search_is_rejected(self):
+        self.assertEqual(self.client.post("/search", json={"query": "   "}).status_code, 422)
 
     def test_websocket_snapshot(self):
         with self.client.websocket_connect("/ws") as websocket:

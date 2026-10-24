@@ -49,7 +49,12 @@ jobs:
         run: |
           python scripts/preflight_check.py --build-time
 
-      - name: Execute Comprehensive Test Suite (52 Tests)
+      - name: Set up Node for frontend runtime regression tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Execute Regression Test Suite
         env:
           CI: "true"
         run: |

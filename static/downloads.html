@@ -197,6 +197,12 @@
       return;
     }
 
+    if (msg.type === 'new_job' && msg.job) {
+      jobsState[msg.job.id] = msg.job;
+      renderAll();
+      return;
+    }
+
     if (msg.type === 'progress') {
       if (!jobsState[msg.job_id]) return;
       Object.assign(jobsState[msg.job_id], {
@@ -287,6 +293,7 @@
   function jobHtml(job) {
     const statusColor = {
       queued: 'text-gray-400',
+      preparing: 'text-blue-400',
       downloading: 'text-blue-400',
       processing: 'text-yellow-400',
       complete: 'text-green-400',
@@ -295,6 +302,7 @@
 
     const statusLabel = {
       queued: 'Queued',
+      preparing: 'Preparing media…',
       downloading: 'Downloading',
       processing: 'Processing…',
       complete: 'Complete',
@@ -445,13 +453,14 @@
   function getDownloadName(job) {
     const raw = job.title || 'download';
     const clean = raw.replace(/[\\/*?:"<>|]/g, '').trim() || 'download';
-    const ext = job.format === 'audio' ? '.mp3' : '.mp4';
+    const ext = job.filename ? '.' + job.filename.split('.').pop() : (job.format === 'audio' ? '.mp3' : '.mp4');
     return clean.slice(0, 160) + ext;
   }
 
   // ── Init ─────────────────────────────────────────────────
   fetchJobs();
   connect();
+  setInterval(fetchJobs, 3000);
 </script>
 </body>
 </html>

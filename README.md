@@ -15,7 +15,7 @@
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white" alt="FastAPI" /></a>
     <a href="https://github.com/yt-dlp/yt-dlp"><img src="https://img.shields.io/badge/yt--dlp-Active-FF0000?logo=youtube&logoColor=white" alt="yt-dlp" /></a>
     <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white" alt="Docker" /></a>
-    <a href="https://github.com/chinmaykrishnroy/YouTubeDownloader/tree/main/tests"><img src="https://img.shields.io/badge/Tests-52%20Passed-brightgreen?logo=pytest&logoColor=white" alt="Tests" /></a>
+    <a href="https://github.com/chinmaykrishnroy/YouTubeDownloader/tree/main/tests"><img src="https://img.shields.io/badge/Tests-85%20Cases-brightgreen?logo=pytest&logoColor=white" alt="Tests" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
   </p>
 
@@ -25,7 +25,7 @@
 
 ## Features
 
-* **Asynchronous Non-Blocking Engine**: Built with FastAPI and background worker thread pools (`asyncio.to_thread`), preventing I/O stalls during concurrent downloads.
+* **Asynchronous Non-Blocking Engine**: Built with FastAPI and supervised yt-dlp/FFmpeg processes. Cancellation and timeouts terminate abandoned workers and release their queue slots.
 * **True Audio Transcoding**: Real FFmpeg audio extraction to genuine MP3 with user-selectable bitrates (`320kbps`, `256kbps`, `192kbps`, `128kbps`) and automated `mutagen` ID3 metadata tagging (title, artist, album art).
 * **Draggable Floating HUD**: Interactive bottom-right floating playback and download HUD that can be freely dragged across the viewport with state persistence.
 * **Real-Time WebSocket Streaming**: Bi-directional real-time updates for progress percentage, transfer rate, ETA, and job state transitions with automatic HTTP polling fallback.
@@ -117,11 +117,12 @@ cp .env.example .env
 | `HOST` | `0.0.0.0` | Binding network interface IP address |
 | `PORT` | `8000` | Application HTTP and WebSocket listening port |
 | `DOWNLOADS_DIR_PATH` | OS temporary directory | Optional override for private temporary media storage |
-| `MAX_CONCURRENT_DOWNLOADS` | `3` | Maximum simultaneous active download tasks |
-| `MAX_DOWNLOADS_CACHE_MB` | `5000` | Disk quota in megabytes before oldest files are purged |
-| `DOWNLOAD_TTL_SECONDS` | `1800` | Time-to-live in seconds before completed files expire |
+| `MAX_CONCURRENT_DOWNLOADS` | `4` | Maximum simultaneous supervised download processes |
+| `MAX_DISK_STORAGE_BYTES` | `3221225472` | Cache quota; active downloads and transfers are protected |
+| `CLEANUP_TTL_SECONDS` | `1800` | Time-to-live in seconds before completed files expire |
+| `DOWNLOAD_TIMEOUT_SECONDS` | `1800` | Maximum download worker lifetime, including conversion |
 | Session disconnect grace | 15 seconds | Allows refresh/reconnection before deleting that browser session |
-| `AUTO_OPEN_BROWSER` | `true` | Automatically open default browser on local startup |
+| `PUBLIC_ORIGIN` | *(none)* | Public browser origin for HTTPS tunnels/reverse proxies |
 | `YTDLP_COOKIES_PATH` | *(none)* | Path to optional Netscape cookies file for YouTube authentication |
 | `YTDLP_COOKIES_FROM_BROWSER` | *(none)* | Optional browser name to extract cookies from (e.g. `chrome`, `firefox`) |
 
@@ -157,7 +158,7 @@ If a mandatory component is missing, startup halts immediately with an actionabl
 
 ### Auto-Cleanup Policies:
 1. **Private Sessions**: An opaque HttpOnly, SameSite cookie identifies each browser session. Queue listings, job operations, file delivery, and WebSocket events enforce ownership. Tabs in one browser share their queue; other browsers/devices cannot see it.
-2. **Session Disconnect**: After the last socket for a browser disconnects, its jobs and temporary files are removed after a 15-second reconnect grace period. Silent connections time out after 60 seconds; sessions without sockets expire after 90 seconds. Running yt-dlp workers stop at the next progress callback and remove any late output when they exit.
+2. **Session Disconnect**: After the last socket for a browser disconnects, its jobs and temporary files are removed after a 15-second reconnect grace period. Silent connections time out after 60 seconds; sessions without sockets expire after 90 seconds. Running yt-dlp/FFmpeg process groups terminate on cancellation, and cleanup runs again after they exit.
 3. **File Delivery**: Media remains available privately until the user chooses Save. Once the full response finishes, its job and temporary files are deleted. This confirms transfer to the browser, not whether the user retained the file. Interrupted transfers are also discarded; restart the download to retry. Partial/range downloads are unsupported.
 
 4. **TTL Expiration**: Completed downloads older than `CLEANUP_TTL_SECONDS` (default: 30 minutes) are automatically unlinked.
@@ -172,11 +173,17 @@ The default cache is a process-specific OS temporary directory, and Docker no lo
 
 ## Testing and CI Pipeline
 
-The project includes a suite of **64 automated unit, integration, and end-to-end tests**:
+The project includes a suite of **85 automated unit, integration, and end-to-end tests**:
 
 ```bash
-# Run full test suite
+# Deterministic regression suite (Node.js runs frontend behavior checks)
 python tests/run_tests.py
+
+# Include the real YouTube audio download integration test (Bash)
+RUN_LIVE_TESTS=1 python tests/run_tests.py
+
+# PowerShell equivalent
+$env:RUN_LIVE_TESTS="1"; python tests/run_tests.py
 ```
 
 ### GitHub Actions CI Workflow:

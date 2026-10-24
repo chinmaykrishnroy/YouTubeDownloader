@@ -26,7 +26,7 @@ elif command -v python >/dev/null 2>&1; then
     PY_CMD="python"
 else
     echo "[ERROR] Python 3 is not installed or not in PATH!"
-    echo "Please install Python 3.10+ (e.g. sudo apt install python3 python3-venv)"
+    echo "Please install Python 3.11+ (e.g. sudo apt install python3 python3-venv)"
     exit 1
 fi
 

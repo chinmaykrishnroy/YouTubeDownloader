@@ -35,7 +35,7 @@ def run_all_tests():
 
     print("\n" + "=" * 70)
     if result.wasSuccessful():
-        print(f" [PASS] ALL {result.testsRun} TESTS COMPLETED SUCCESSFULLY! ")
+        print(f" [PASS] {result.testsRun - len(result.skipped)} tests passed; {len(result.skipped)} skipped. ")
         print("=" * 70)
         return 0
     else:

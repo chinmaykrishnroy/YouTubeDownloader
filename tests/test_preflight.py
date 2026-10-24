@@ -41,14 +41,9 @@ class TestPreflightCheck(unittest.TestCase):
                 check_storage_permissions()
 
     def test_check_ytdlp_operational_success(self):
-        # Live self test
-        try:
+        with patch("yt_dlp.YoutubeDL") as ydl:
+            ydl.return_value.__enter__.return_value.extract_info.return_value = {"entries": [{"id": "example"}]}
             check_ytdlp_operational(skip_network=False)
-        except PreflightException as exc:
-            err_text = str(exc).lower()
-            if any(k in err_text for k in ["bot", "429", "rate", "sign in", "network", "connection", "cookies", "timeout", "temporary"]):
-                self.skipTest(f"Live network preflight check skipped due to environment rate limit: {exc}")
-            raise
 
     def test_check_ytdlp_operational_skip(self):
         # Skipping network flag

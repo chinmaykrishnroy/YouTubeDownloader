@@ -657,17 +657,26 @@ let watchFmt = 'video';
 let panelFmt = 'video';
 let ytPlayer = null;
 let ytApiReady = false;
+let playerReady = false;
+let playerGeneration = 0;
 let autoplayEnabled = true;  // Autoplay ON by default
 let consecutiveErrors = 0;
+let searchGeneration = 0;
 
 /* ── Jobs & WebSocket State ── */
 const jobsState = {};
 let ws = null;
 let reconnectTimer = null;
+let wsPingInterval = null;
+let jobsFetchInFlight = false;
+let wsConnecting = false;
 
 /* ── YouTube API Ready Hook ── */
 window.onYouTubeIframeAPIReady = function() {
   ytApiReady = true;
+  if (activeVideo && watchState !== 'closed' && !ytPlayer) {
+    mountYouTubePlayer(activeVideo.id);
+  }
 };
 
 /* ── Safe HTML escaping ── */
@@ -875,6 +884,7 @@ document.getElementById('searchForm').addEventListener('submit', function(e) {
 });
 
 async function doSearch(query) {
+  const generation = ++searchGeneration;
   showSkeleton(12);
   try {
     const res = await fetch('/search', {
@@ -884,9 +894,11 @@ async function doSearch(query) {
     });
     if (!res.ok) throw new Error('Search request failed (HTTP ' + res.status + ')');
     const data = await res.json();
+    if (generation !== searchGeneration) return;
     currentVideos = data.results || [];
     renderResults(query, currentVideos);
   } catch (err) {
+    if (generation !== searchGeneration) return;
     console.error('Search error:', err);
     showError('Search error: ' + err.message);
   }
@@ -962,7 +974,7 @@ function renderResults(query, videos) {
 /* ═══════════════════════════ WATCH MODAL & SEAMLESS MINI-PLAYER ═══════════════════════════ */
 async function openWatch(video, fromUserClick = true) {
   activeVideo = video;
-  consecutiveErrors = 0;
+  if (fromUserClick) consecutiveErrors = 0;
   sessionPlayed.add(video.id);
 
   if (fromUserClick) {
@@ -1007,10 +1019,21 @@ async function openWatch(video, fromUserClick = true) {
   fetchRelatedVideos(video);
 }
 
+function destroyYouTubePlayer() {
+  playerGeneration++;
+  const previous = ytPlayer;
+  ytPlayer = null;
+  playerReady = false;
+  if (previous && previous.destroy) {
+    try { previous.destroy(); } catch (error) { console.warn('Player cleanup failed', error); }
+  }
+  document.getElementById('ytPlayerContainer').innerHTML = '';
+}
+
 function mountYouTubePlayer(videoId) {
   const container = document.getElementById('ytPlayerContainer');
 
-  if (ytPlayer && ytPlayer.loadVideoById) {
+  if (ytPlayer && playerReady && ytPlayer.loadVideoById && container.querySelector('iframe')) {
     try {
       ytPlayer.loadVideoById(videoId);
       return;
@@ -1019,6 +1042,8 @@ function mountYouTubePlayer(videoId) {
     }
   }
 
+  destroyYouTubePlayer();
+  const generation = playerGeneration;
   // Clear and mount new player
   container.innerHTML = `<div id="ytIframePlayer"></div>`;
 
@@ -1030,20 +1055,31 @@ function mountYouTubePlayer(videoId) {
       playerVars: {
         autoplay: 1,
         rel: 0,
-        modestbranding: 1
+        modestbranding: 1,
+        playsinline: 1,
+        origin: location.origin
       },
       events: {
         onReady: (e) => {
+          if (generation !== playerGeneration || watchState === 'closed') return;
+          playerReady = true;
           e.target.playVideo();
           updateMiniPlayState();
         },
-        onStateChange: onPlayerStateChange,
-        onError: onPlayerError
+        onStateChange: (event) => {
+          if (generation === playerGeneration) onPlayerStateChange(event);
+        },
+        onError: (event) => {
+          if (generation === playerGeneration) onPlayerError(event);
+        },
+        onAutoplayBlocked: () => {
+          if (generation === playerGeneration) toast('Tap Play in the video to start playback.');
+        }
       }
     });
   } else {
     container.innerHTML = `
-      <iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0"
+      <iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&playsinline=1"
               frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen>
       </iframe>`;
   }
@@ -1088,6 +1124,7 @@ function onPlayerError(event) {
   consecutiveErrors++;
 
   if (consecutiveErrors > 4) {
+    if (autoplayEnabled) toggleAutoplay();
     toast('⚠️ Multiple videos restricted by YouTube. Pausing autoplay.');
     consecutiveErrors = 0;
     return;
@@ -1101,8 +1138,10 @@ function onPlayerError(event) {
 
   toast('⚠️ Video unavailable for embed. Auto-skipping to next media…');
 
+  const generation = playerGeneration;
+  const failedVideo = activeVideo;
   setTimeout(() => {
-    playNextVideo(true);
+    if (generation === playerGeneration && activeVideo === failedVideo && watchState !== 'closed') playNextVideo(true);
   }, 1000);
 }
 
@@ -1139,6 +1178,7 @@ async function fetchRelatedVideos(video) {
     });
     if (!res.ok) return;
     const data = await res.json();
+    if (!activeVideo || activeVideo.id !== video.id) return;
     if (data.results && data.results.length) {
       const existingIds = new Set(upcomingQueue.map(v => v.id));
       existingIds.add(activeVideo ? activeVideo.id : '');
@@ -1433,10 +1473,7 @@ function closeWatch(e) {
   modal.className = 'hidden fixed inset-0 z-50 bg-[#0f0f0f] flex flex-col overflow-hidden';
   document.body.style.overflow = '';
 
-  if (ytPlayer && ytPlayer.stopVideo) {
-    try { ytPlayer.stopVideo(); } catch(e) {}
-  }
-  document.getElementById('ytPlayerContainer').innerHTML = '';
+  destroyYouTubePlayer();
   activeVideo = null;
 }
 
@@ -1532,7 +1569,7 @@ async function doWatchDownload() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (data.job) {
-      jobsState[data.job.id] = data.job;
+      jobsState[data.job.id] = {...data.job, ...jobsState[data.job.id]};
       updateDlBadges();
     }
 
@@ -1619,7 +1656,7 @@ async function startDownload(video, fmt, quality) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (data.job) {
-      jobsState[data.job.id] = data.job;
+      jobsState[data.job.id] = {...data.job, ...jobsState[data.job.id]};
       updateDlBadges();
       if (currentView === 'downloads') renderDownloads();
     }
@@ -1632,7 +1669,7 @@ async function startDownload(video, fmt, quality) {
 
 function getSafeDownloadName(job) {
   const clean = (job.title || 'download').replace(/[\\/*?:"<>|]/g, '').trim() || 'download';
-  const ext = job.format === 'audio' ? '.mp3' : '.mp4';
+  const ext = job.filename ? '.' + job.filename.split('.').pop() : (job.format === 'audio' ? '.mp3' : '.mp4');
   return clean.slice(0, 160) + ext;
 }
 
@@ -1665,7 +1702,7 @@ function renderDownloads() {
 }
 
 function updateDlBadges() {
-  const activeCount = Object.values(jobsState).filter(j => j.status === 'downloading' || j.status === 'processing' || j.status === 'queued').length;
+  const activeCount = Object.values(jobsState).filter(j => j.status === 'preparing' || j.status === 'downloading' || j.status === 'processing' || j.status === 'queued').length;
   const navBadge = document.getElementById('navDlBadge');
   const wmBadge = document.getElementById('wmDlBadge');
 
@@ -1687,6 +1724,7 @@ function buildJobElement(job) {
 
   const statusColor = {
     queued: 'text-gray-400',
+    preparing: 'text-blue-400',
     downloading: 'text-blue-400',
     processing: 'text-yellow-400',
     complete: 'text-emerald-400',
@@ -1695,6 +1733,7 @@ function buildJobElement(job) {
 
   const statusLabel = {
     queued: 'Queued',
+    preparing: 'Preparing media…',
     downloading: 'Downloading',
     processing: 'Processing…',
     complete: 'Complete',
@@ -1730,10 +1769,10 @@ function buildJobElement(job) {
       <div class="text-right shrink-0 max-w-[180px]">
         <p class="text-[11px] text-red-400 leading-tight">${h((job.error || 'Error').slice(0, 100))}</p>
       </div>`;
-  } else if (job.status === 'processing') {
+  } else if (job.status === 'preparing' || job.status === 'processing') {
     rightSection = `
       <div class="text-right shrink-0">
-        <p class="text-xs text-yellow-400 animate-pulse">Processing…</p>
+        <p class="text-xs text-yellow-400 animate-pulse">${job.status === 'preparing' ? 'Preparing media…' : 'Processing…'}</p>
       </div>`;
   } else {
     rightSection = `
@@ -1822,8 +1861,10 @@ async function clearCompleted() {
 
 /* ── Fetch Jobs REST Fallback ── */
 async function fetchJobs() {
+  if (jobsFetchInFlight) return;
+  jobsFetchInFlight = true;
   try {
-    const res = await fetch('/jobs');
+    const res = await fetch('/jobs', {cache: 'no-store', signal: AbortSignal.timeout(10000)});
     if (!res.ok) return;
     const data = await res.json();
     Object.keys(jobsState).forEach(id => delete jobsState[id]);
@@ -1832,12 +1873,24 @@ async function fetchJobs() {
     if (currentView === 'downloads') renderDownloads();
   } catch (err) {
     console.warn('fetchJobs error', err);
+  } finally {
+    jobsFetchInFlight = false;
   }
 }
 
 /* ── WebSocket Setup for Live Progress ── */
 async function connectWebSocket() {
-  await fetch('/session', {cache: 'no-store'});
+  if (wsConnecting || (ws && [WebSocket.CONNECTING, WebSocket.OPEN].includes(ws.readyState))) return;
+  wsConnecting = true;
+  try {
+    const session = await fetch('/session', {cache: 'no-store', signal: AbortSignal.timeout(10000)});
+    if (!session.ok) throw new Error('Session initialization failed');
+  } catch (error) {
+    wsConnecting = false;
+    reconnectTimer = setTimeout(connectWebSocket, 3000);
+    return;
+  }
+  wsConnecting = false;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${window.location.host}/ws`);
 
@@ -1964,6 +2017,13 @@ initMiniDrag();
 checkSystemStatus();
 fetchJobs();
 connectWebSocket();
+// Reconcile terminal states even if a mobile connection misses live events.
+setInterval(() => {
+  if (currentView === 'downloads' || Object.values(jobsState).some(job => !['complete', 'error'].includes(job.status))) fetchJobs();
+}, 3000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) fetchJobs();
+});
 
 // Detect initial route
 if (location.pathname === '/downloads-page') {

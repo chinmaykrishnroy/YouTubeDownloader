@@ -129,7 +129,9 @@ class TestExtendedCoverage(unittest.TestCase):
             self.assertIn("apt update", resp.json()["guide"])
 
     def test_related_endpoint(self):
-        resp = self.client.post("/related", json={"video_id": "vg95MYlTb3c", "title": "Alan Walker Fade", "limit": 2})
+        with patch("main.search_youtube", return_value=[{"id": "vg95MYlTb3c"}, {"id": "next-video"}]):
+            resp = self.client.post("/related", json={"video_id": "vg95MYlTb3c", "title": "Alan Walker Fade", "limit": 2})
+        self.assertEqual(resp.json()["results"], [{"id": "next-video"}])
         if resp.status_code == 500:
             err = resp.json().get("detail", "")
             if any(k in str(err).lower() for k in ["bot", "429", "sign in", "rate"]):
@@ -141,7 +143,9 @@ class TestExtendedCoverage(unittest.TestCase):
 
     def test_formats_endpoint(self):
         # Fast query for public video formats
-        resp = self.client.get("/formats/vg95MYlTb3c")
+        with patch("main.yt_dlp.YoutubeDL") as ydl:
+            ydl.return_value.__enter__.return_value.extract_info.return_value = {"formats": [{"height": 720, "ext": "mp4", "format_id": "22"}]}
+            resp = self.client.get("/formats/vg95MYlTb3c")
         if resp.status_code == 500:
             err = resp.json().get("detail", "")
             if any(k in str(err).lower() for k in ["bot", "429", "sign in", "rate"]):
@@ -152,7 +156,9 @@ class TestExtendedCoverage(unittest.TestCase):
         self.assertIsInstance(data["formats"], list)
 
     def test_formats_endpoint_invalid_video(self):
-        resp = self.client.get("/formats/INVALID_ID_99999999")
+        with patch("main.yt_dlp.YoutubeDL") as ydl:
+            ydl.return_value.__enter__.return_value.extract_info.side_effect = RuntimeError("Video unavailable")
+            resp = self.client.get("/formats/INVALID_ID_99999999")
         self.assertEqual(resp.status_code, 500)
 
     def test_cookies_opts_with_custom_path(self):

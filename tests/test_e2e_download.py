@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import unittest
@@ -12,16 +13,22 @@ from fastapi.testclient import TestClient
 from main import app, jobs, DOWNLOADS_DIR
 
 
+@unittest.skipUnless(os.environ.get("RUN_LIVE_TESTS") == "1", "Set RUN_LIVE_TESTS=1 for live YouTube integration")
 class TestE2ENCSDownload(unittest.TestCase):
     """End-to-End integration test downloading NCS Fade audio through the full application stack."""
 
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
+        cls.client.__enter__()
         cls.client.get("/session")
         # Canonical public YouTube video for Alan Walker - Fade (NCS)
         cls.target_url = "https://www.youtube.com/watch?v=vg95MYlTb3c"
         cls.target_title = "Alan Walker - Fade"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.__exit__(None, None, None)
 
     def test_ncs_fade_audio_download_and_serve(self):
         # 1. Initiate audio download job
