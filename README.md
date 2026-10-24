@@ -1,50 +1,54 @@
 <div align="center">
 
-# ⚡ YouTube Downloader
+  <img src="static/icon.svg" width="80" height="56" alt="YouTube Downloader Logo" />
 
-<p align="center">
-  <strong>High-performance, asynchronous YouTube media downloader with genuine audio transcoding, real-time WebSocket HUD tracking, and defensive storage management.</strong>
-</p>
+  <h1>YouTube Downloader</h1>
 
-[![CI & Release Pipeline](https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml/badge.svg)](https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/chinmaykrishnroy/YouTubeDownloader?color=blue&logo=github)](https://github.com/chinmaykrishnroy/YouTubeDownloader/releases)
-[![Python Version](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![yt-dlp](https://img.shields.io/badge/yt--dlp-Active-FF0000?logo=youtube&logoColor=white)](https://github.com/yt-dlp/yt-dlp)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-52%20Passed-brightgreen?logo=pytest&logoColor=white)](https://github.com/chinmaykrishnroy/YouTubeDownloader/tree/main/tests)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+  <p>
+    <strong>Asynchronous YouTube media downloader with genuine audio transcoding, real-time WebSocket HUD tracking, and defensive storage management.</strong>
+  </p>
+
+  <p>
+    <a href="https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml"><img src="https://github.com/chinmaykrishnroy/YouTubeDownloader/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline Status" /></a>
+    <a href="https://github.com/chinmaykrishnroy/YouTubeDownloader/releases"><img src="https://img.shields.io/github/v/release/chinmaykrishnroy/YouTubeDownloader?color=blue&logo=github" alt="Latest Release" /></a>
+    <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white" alt="Python 3.11 | 3.12" /></a>
+    <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white" alt="FastAPI" /></a>
+    <a href="https://github.com/yt-dlp/yt-dlp"><img src="https://img.shields.io/badge/yt--dlp-Active-FF0000?logo=youtube&logoColor=white" alt="yt-dlp" /></a>
+    <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white" alt="Docker" /></a>
+    <a href="https://github.com/chinmaykrishnroy/YouTubeDownloader/tree/main/tests"><img src="https://img.shields.io/badge/Tests-52%20Passed-brightgreen?logo=pytest&logoColor=white" alt="Tests" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+  </p>
 
 </div>
 
 ---
 
-## 🌟 Key Features
+## Features
 
-* ⚡ **Asynchronous Non-Blocking Engine**: Built with FastAPI and background worker thread pools (`asyncio.to_thread`), preventing I/O stalls during concurrent downloads.
-* 🎵 **True Audio Transcoding**: Real FFmpeg audio extraction to genuine MP3 with user-selectable bitrates (`320kbps`, `256kbps`, `192kbps`, `128kbps`) and automated `mutagen` ID3 metadata tagging (title, artist, album art).
-* 🖥️ **Draggable Floating HUD**: Interactive bottom-right floating playback and download HUD that can be freely dragged across the viewport with state persistence.
-* 📡 **Real-Time WebSocket Streaming**: Bi-directional real-time updates for progress percentage, transfer rate, ETA, and job state transitions with automatic HTTP polling fallback.
-* 🛡️ **Pre-Flight Verification Gate**: Built-in verification script (`scripts/preflight_check.py`) that audits dependencies, write permissions, live YouTube connectivity, and FFmpeg before startup.
-* 🧹 **Automated Lifecycle & Storage Guard**: Multi-tier auto-cleanup that purges expired downloads when browser sessions close, evicts oldest cache files when disk quotas are reached, and cleans stale partial files.
-* 🔒 **Crash-Proof Directory Management**: Defensive directory handling ensures the application never crashes if the `downloads/` folder is deleted or emptied at runtime.
-* 🐳 **Production Docker Container**: Debian 12 Bookworm base with native FFmpeg, non-root user isolation, and automatic healthcheck monitoring.
+* **Asynchronous Non-Blocking Engine**: Built with FastAPI and background worker thread pools (`asyncio.to_thread`), preventing I/O stalls during concurrent downloads.
+* **True Audio Transcoding**: Real FFmpeg audio extraction to genuine MP3 with user-selectable bitrates (`320kbps`, `256kbps`, `192kbps`, `128kbps`) and automated `mutagen` ID3 metadata tagging (title, artist, album art).
+* **Draggable Floating HUD**: Interactive bottom-right floating playback and download HUD that can be freely dragged across the viewport with state persistence.
+* **Real-Time WebSocket Streaming**: Bi-directional real-time updates for progress percentage, transfer rate, ETA, and job state transitions with automatic HTTP polling fallback.
+* **Pre-Flight Verification Gate**: Built-in verification script (`scripts/preflight_check.py`) that audits dependencies, write permissions, live YouTube connectivity, and FFmpeg before startup.
+* **Automated Lifecycle and Storage Guard**: Multi-tier auto-cleanup that purges expired downloads when browser sessions close, evicts oldest cache files when disk quotas are reached, and cleans stale partial files.
+* **Crash-Proof Directory Management**: Defensive directory handling ensures the application never crashes if the `downloads/` folder is deleted or emptied at runtime.
+* **Production Docker Container**: Debian 12 Bookworm base with native FFmpeg, non-root user isolation, and automatic healthcheck monitoring.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### Option 1: Automated Start Scripts (Recommended)
+### Automated Start Scripts (Recommended)
 
 The automated launchers create a virtual environment (`.venv`), install dependencies, verify pre-flight components, launch the application, and open your browser automatically.
 
-#### 🪟 Windows
+#### Windows
 Double-click `start.bat` or run:
 ```cmd
 start.bat
 ```
 
-#### 🐧 Linux & 🍎 macOS
+#### Linux and macOS
 Make executable and run:
 ```bash
 chmod +x start.sh scripts/run.sh
@@ -53,9 +57,9 @@ chmod +x start.sh scripts/run.sh
 
 ---
 
-### Option 2: Docker & Docker Compose
+### Docker and Docker Compose
 
-Deploy the application in a sandboxed, production container with pre-configured FFmpeg and health checks:
+Deploy the application in a sandboxed container with pre-configured FFmpeg and health checks:
 
 ```bash
 # Build and run container in detached mode
@@ -72,7 +76,7 @@ Access the interface at `http://localhost:8000`.
 
 ---
 
-### Option 3: Manual Setup
+### Manual Setup
 
 ```bash
 # 1. Clone repository
@@ -93,14 +97,14 @@ pip install -r requirements.txt
 # 4. Copy configuration
 cp .env.example .env
 
-# 5. Run pre-flight check & start server
+# 5. Run pre-flight check and start server
 python scripts/preflight_check.py
 python main.py
 ```
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Copy `.env.example` to `.env` to customize runtime parameters:
 
@@ -111,18 +115,19 @@ cp .env.example .env
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `HOST` | `0.0.0.0` | Binding network interface IP address |
-| `PORT` | `8000` | Application HTTP & WebSocket listening port |
+| `PORT` | `8000` | Application HTTP and WebSocket listening port |
 | `DOWNLOADS_DIR` | `downloads` | Local directory for temporary storage of downloads |
 | `MAX_CONCURRENT_DOWNLOADS` | `3` | Maximum simultaneous active download tasks |
 | `MAX_DOWNLOADS_CACHE_MB` | `5000` | Disk quota in megabytes before oldest files are purged |
 | `DOWNLOAD_TTL_SECONDS` | `1800` | Time-to-live in seconds before completed files expire |
 | `SESSION_CLEANUP_DELAY_SECONDS`| `30` | Grace period after all client tabs close before auto-cleaning |
 | `AUTO_OPEN_BROWSER` | `true` | Automatically open default browser on local startup |
-| `YTDL_COOKIES_PATH` | *(none)* | Path to optional Netscape cookies file for YouTube authentication |
+| `YTDLP_COOKIES_PATH` | *(none)* | Path to optional Netscape cookies file for YouTube authentication |
+| `YTDLP_COOKIES_FROM_BROWSER` | *(none)* | Optional browser name to extract cookies from (e.g. `chrome`, `firefox`) |
 
 ---
 
-## 🛡️ Pre-Flight Verification Gate
+## Pre-Flight Verification Gate
 
 Before the server accepts traffic, [`scripts/preflight_check.py`](scripts/preflight_check.py) verifies critical components:
 
@@ -143,11 +148,11 @@ If a mandatory component is missing, startup halts immediately with an actionabl
 
 ---
 
-## 🧹 Storage Lifecycle & Deletion Safety
+## Storage Lifecycle and Safety
 
 > **What happens if I delete or empty the `downloads/` folder?**
 >
-> **The application will NEVER crash.**
+> **The application will not crash.**
 > The server uses defensive directory handling (`DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)`). It verifies folder existence at boot, recreates it immediately before any write operation, and safely guards cleanup passes against missing directories.
 
 ### Auto-Cleanup Policies:
@@ -158,9 +163,9 @@ If a mandatory component is missing, startup halts immediately with an actionabl
 
 ---
 
-## 🧪 Testing & CI Pipeline
+## Testing and CI Pipeline
 
-The project includes a comprehensive suite of **52 automated unit, integration, and end-to-end tests**:
+The project includes a suite of **52 automated unit, integration, and end-to-end tests**:
 
 ```bash
 # Run full test suite
@@ -175,13 +180,13 @@ python tests/run_tests.py
 
 ```bash
 # Create and push a new release tag
-git tag -a v4.0.0 -m "Release v4.0.0"
-git push origin v4.0.0
+git tag -a v4.0.1 -m "Release v4.0.1"
+git push origin v4.0.1
 ```
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
@@ -197,6 +202,6 @@ git push origin v4.0.0
 
 ---
 
-## 📄 License
+## License
 
-Distributed under the [MIT License](LICENSE). Copyright (c) 2023–2026 Chinmay Krishn Roy.
+Distributed under the [MIT License](LICENSE). Copyright (c) 2023-2026 Chinmay Krishn Roy.

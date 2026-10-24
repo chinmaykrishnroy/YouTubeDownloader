@@ -321,18 +321,15 @@ async def broadcast(message: dict):
 # yt-dlp helpers & Anti-Blocking Config
 # ---------------------------------------------------------------------------
 def _get_cookies_opts() -> dict:
-    """Try to grab browser cookies or custom cookiefile to bypass YouTube 403 blocks.
-    Returns extra yt-dlp opts dict; empty dict if nothing available."""
+    """Configures yt-dlp cookie options.
+    If YTDLP_COOKIES_PATH points to a valid file, uses it.
+    If YTDLP_COOKIES_FROM_BROWSER is explicitly configured in .env, uses that browser.
+    Returns extra yt-dlp opts dict; empty dict if not configured."""
     if YTDLP_COOKIES_PATH and Path(YTDLP_COOKIES_PATH).exists():
         return {"cookiefile": str(Path(YTDLP_COOKIES_PATH).resolve())}
-    import shutil
-    # Prefer Chrome, then Firefox, then Edge — whichever is installed
-    for browser in ("chrome", "firefox", "edge", "brave", "chromium", "opera"):
-        try:
-            if shutil.which(browser) or shutil.which(browser.capitalize()):
-                return {"cookiesfrombrowser": (browser, None, None, None)}
-        except Exception:
-            pass
+    browser_env = os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "").strip()
+    if browser_env:
+        return {"cookiesfrombrowser": (browser_env.lower(), None, None, None)}
     return {}
 
 

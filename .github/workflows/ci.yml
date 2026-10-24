@@ -50,6 +50,8 @@ jobs:
           python scripts/preflight_check.py --build-time
 
       - name: Execute Comprehensive Test Suite (52 Tests)
+        env:
+          CI: "true"
         run: |
           python tests/run_tests.py
 
@@ -71,10 +73,21 @@ jobs:
       - name: Verify Container Execution & Healthcheck
         run: |
           docker run -d --name yt-ci-test -p 8000:8000 yt-downloader:ci
-          sleep 8
-          curl -f http://localhost:8000/system-status || exit 1
+          for i in {1..15}; do
+            if curl -s -f http://localhost:8000/system-status; then
+              echo "Healthcheck passed successfully."
+              docker stop yt-ci-test
+              docker rm yt-ci-test
+              exit 0
+            fi
+            echo "Waiting for container startup ($i/15)..."
+            sleep 2
+          done
+          echo "Container failed to respond within timeout. Logs:"
+          docker logs yt-ci-test
           docker stop yt-ci-test
           docker rm yt-ci-test
+          exit 1
 
   release:
     name: Publish Tagged Release
