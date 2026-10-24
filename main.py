@@ -15,7 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+import urllib.parse
+from pydantic import BaseModel, Field
 
 BASE_DIR = Path(__file__).parent
 
@@ -122,29 +123,33 @@ def clean_stale_files(max_age_seconds: int = CLEANUP_TTL_SECONDS) -> int:
             except Exception:
                 pass
 
-    # 2. Clean completed or error jobs older than max_age_seconds
+    # 2. Clean completed, error, or stuck in-flight jobs older than TTL
     for job_id, job in list(jobs.items()):
-        if job.get("status") in ("complete", "error"):
-            try:
-                created_ts = datetime.fromisoformat(job["created_at"]).timestamp()
-            except Exception:
-                created_ts = now
+        status = job.get("status")
+        try:
+            created_ts = datetime.fromisoformat(job["created_at"]).timestamp()
+        except Exception:
+            created_ts = now
 
-            if (now - created_ts) > max_age_seconds:
-                fn = job.get("filename")
-                if fn:
-                    fp = DOWNLOADS_DIR / fn
-                    if fp.exists():
-                        try:
-                            fp.unlink(missing_ok=True)
-                            removed_count += 1
-                            logger.info(f"[Auto-Clean] TTL expired for job {job_id}: {fn}")
-                        except Exception:
-                            pass
-                jobs.pop(job_id, None)
+        age = now - created_ts
+        is_completed_expired = status in ("complete", "error") and age > max_age_seconds
+        is_stuck = status in ("queued", "downloading", "processing") and age > max(max_age_seconds * 2, 3600)
+
+        if is_completed_expired or is_stuck:
+            fn = job.get("filename")
+            if fn:
+                fp = DOWNLOADS_DIR / fn
+                if fp.exists():
+                    try:
+                        fp.unlink(missing_ok=True)
+                        removed_count += 1
+                        logger.info(f"[Auto-Clean] TTL expired for job {job_id}: {fn}")
+                    except Exception:
+                        pass
+            jobs.pop(job_id, None)
 
     # 3. Clean files in DOWNLOADS_DIR not tracked by active jobs older than max_age_seconds
-    active_filenames = {j.get("filename") for j in jobs.values() if j.get("filename")}
+    active_filenames = {j.get("filename") for j in list(jobs.values()) if j.get("filename")}
     for fp in DOWNLOADS_DIR.iterdir():
         if fp.is_file() and fp.name not in active_filenames:
             try:
@@ -192,6 +197,7 @@ async def schedule_file_cleanup(job_id: str, delay_seconds: int = FILE_POST_DOWN
             if fp.exists():
                 try:
                     fp.unlink(missing_ok=True)
+                    job["filename"] = None
                     logger.info(f"[Post-Download Clean] Removed served file for job {job_id}: {fn}")
                 except Exception as e:
                     logger.warning(f"Failed cleaning file {fn}: {e}")
@@ -243,7 +249,7 @@ ALLOWED_ORIGINS = [orig.strip() for orig in _origins_raw.split(",") if orig.stri
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=(ALLOWED_ORIGINS != ["*"]),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -255,18 +261,18 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # Request models
 # ---------------------------------------------------------------------------
 class SearchRequest(BaseModel):
-    query: str
-    limit: int = 10
+    query: str = Field(..., min_length=1, max_length=500)
+    limit: int = Field(default=10, ge=1, le=50)
 
 
 class RelatedRequest(BaseModel):
-    video_id: str
+    video_id: str = Field(..., min_length=1, max_length=64)
     title: str = ""
-    limit: int = 8
+    limit: int = Field(default=8, ge=1, le=20)
 
 
 class DownloadRequest(BaseModel):
-    url: str
+    url: str = Field(..., min_length=1)
     format: str = "video"   # "video" | "audio"
     quality: str = "720p"
     title: str = ""
@@ -277,10 +283,32 @@ class DownloadRequest(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 def sanitize_filename(name: str) -> str:
-    """Remove characters that are unsafe in filenames."""
-    name = re.sub(r'[\\/*?:"<>|]', "", name)
+    """Remove characters that are unsafe in filenames or HTTP headers."""
+    name = re.sub(r'[\r\n\t\\/*?:"<>|]', "", name)
     name = name.strip().strip(".")
     return name or "download"
+
+
+def is_valid_youtube_url(url: str) -> bool:
+    """Verify that the target URL belongs to an authorized YouTube hostname."""
+    try:
+        parsed = urllib.parse.urlparse(url.strip())
+        if parsed.scheme not in ("http", "https"):
+            return False
+        netloc = parsed.netloc.lower()
+        if ":" in netloc:
+            netloc = netloc.split(":", 1)[0]
+        valid_hosts = {
+            "youtube.com",
+            "www.youtube.com",
+            "m.youtube.com",
+            "music.youtube.com",
+            "youtu.be",
+            "www.youtu.be",
+        }
+        return netloc in valid_hosts
+    except Exception:
+        return False
 
 
 def format_view_count(n: Optional[int]) -> str:
@@ -509,9 +537,11 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
             speed = d.get("_speed_str", "").strip() or "—"
             eta = d.get("_eta_str", "").strip() or "—"
 
-            jobs[job_id].update(
-                {"status": "downloading", "progress": round(pct, 1), "speed": speed, "eta": eta}
-            )
+            cur_job = jobs.get(job_id)
+            if cur_job:
+                cur_job.update(
+                    {"status": "downloading", "progress": round(pct, 1), "speed": speed, "eta": eta}
+                )
             asyncio.run_coroutine_threadsafe(
                 broadcast(
                     {
@@ -526,7 +556,9 @@ def run_download(job_id: str, url: str, fmt: str, quality: str, title: str, loop
                 loop,
             )
         elif d["status"] == "finished":
-            jobs[job_id].update({"progress": 99, "status": "processing"})
+            cur_job = jobs.get(job_id)
+            if cur_job:
+                cur_job.update({"progress": 99, "status": "processing"})
             asyncio.run_coroutine_threadsafe(
                 broadcast({"type": "progress", "job_id": job_id, "progress": 99, "status": "processing", "speed": "", "eta": ""}),
                 loop,
@@ -663,7 +695,7 @@ async def system_status():
 @app.post("/related")
 async def related_endpoint(req: RelatedRequest):
     """Fetch suggested / related videos based on title or video ID."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     query = req.title.strip() if req.title else f"related to {req.video_id}"
     try:
         results = await loop.run_in_executor(None, search_youtube, query, req.limit + 4)
@@ -688,13 +720,18 @@ async def serve_downloads():
 
 @app.post("/search")
 async def search_endpoint(req: SearchRequest):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     results = await loop.run_in_executor(None, search_youtube, req.query, req.limit)
     return {"results": results}
 
 
 @app.post("/download")
 async def start_download(req: DownloadRequest):
+    if not is_valid_youtube_url(req.url):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid YouTube URL. Only official YouTube links (e.g., youtube.com or youtu.be) are supported.",
+        )
     job_id = str(uuid.uuid4())
     job = {
         "id": job_id,
@@ -717,7 +754,7 @@ async def start_download(req: DownloadRequest):
     # Broadcast new job immediately to all active WebSocket connections
     await broadcast({"type": "new_job", "job": job})
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     async def _managed_worker():
         global DOWNLOAD_SEMAPHORE
@@ -814,7 +851,7 @@ async def serve_file(job_id: str, background_tasks: BackgroundTasks):
 async def get_formats(video_id: str):
     url = f"https://www.youtube.com/watch?v={video_id}"
     ydl_opts = _get_base_ydl_opts()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _fetch():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

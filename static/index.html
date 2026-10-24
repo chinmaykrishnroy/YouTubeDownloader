@@ -1596,9 +1596,10 @@ function pFmt(fmt) {
 
 async function doPanelDownload() {
   if (!panelVideo) return;
+  const video = panelVideo;
   const quality = document.getElementById('pQuality').value;
   closePanel();
-  await startDownload(panelVideo, panelFmt, quality);
+  await startDownload(video, panelFmt, quality);
 }
 
 /* ═══════════════════════════ DOWNLOAD API & REAL-TIME WEBSOCKET ═══════════════════════════ */
@@ -1800,7 +1801,11 @@ function updateJobDom(jobId) {
 
 async function removeJob(jobId) {
   try {
-    await fetch(`/jobs/${jobId}`, { method: 'DELETE' });
+    const res = await fetch(`/jobs/${jobId}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) {
+      toast('Failed to remove download job.');
+      return;
+    }
     delete jobsState[jobId];
     renderDownloads();
   } catch (err) {
@@ -1897,7 +1902,8 @@ function connectWebSocket() {
     try { ws.close(); } catch(e){}
   });
 
-  setInterval(() => {
+  if (wsPingInterval) clearInterval(wsPingInterval);
+  wsPingInterval = setInterval(() => {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send('ping');
   }, 20000);
 }

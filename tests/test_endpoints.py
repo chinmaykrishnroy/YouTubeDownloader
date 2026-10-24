@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient
 
-from main import app, jobs, DOWNLOADS_DIR
+from main import app, jobs, DOWNLOADS_DIR, sanitize_filename
 
 
 class TestEndpoints(unittest.TestCase):
@@ -142,11 +142,24 @@ class TestEndpoints(unittest.TestCase):
                     self.assertEqual(resp.content, payload)
                     disposition = resp.headers["content-disposition"]
                     self.assertTrue(disposition.startswith("attachment; filename*=utf-8''"))
-                    self.assertEqual(unquote(disposition.split("''", 1)[1]), f"{title}.mp3")
+                    self.assertEqual(unquote(disposition.split("''", 1)[1]), f"{sanitize_filename(title)}.mp3")
                     self.assertTrue(disposition.isascii())
         finally:
             target_file.unlink(missing_ok=True)
             jobs.pop(job_id, None)
+
+    def test_download_ssrf_rejection(self):
+        malicious_urls = [
+            "file:///etc/passwd",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://localhost:6379/",
+            "https://evil.com/malicious.mp4",
+        ]
+        for url in malicious_urls:
+            with self.subTest(url=url):
+                resp = self.client.post("/download", json={"url": url, "format": "video", "quality": "720p"})
+                self.assertEqual(resp.status_code, 400)
+                self.assertIn("Invalid YouTube URL", resp.json()["detail"])
 
     def test_post_search(self):
         # Test real search endpoint with limit=2

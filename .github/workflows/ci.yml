@@ -108,7 +108,8 @@ jobs:
             -x "*.venv*" \
             -x "*venv*" \
             -x "*downloads*" \
-            -x "*.env"
+            -x ".env" \
+            -x "**/.env"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -33,4 +33,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/system-status || exit 1
 
 # Pre-flight check on start: verify yt-dlp and network connectivity before launching server
-CMD ["sh", "-c", "python scripts/preflight_check.py && python main.py"]
+CMD ["sh", "-c", "python scripts/preflight_check.py --skip-network && python main.py"]

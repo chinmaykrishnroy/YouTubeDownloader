@@ -105,6 +105,7 @@ if exist ".env" (
         set "KEY=!KEY: =!"
         if /i "!KEY!"=="PORT" (
             set "VAL=%%B"
+            for /f "tokens=1 delims=#" %%C in ("!VAL!") do set "VAL=%%C"
             set "VAL=!VAL: =!"
             set "VAL=!VAL:"=!"
             set "VAL=!VAL:'=!"

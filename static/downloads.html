@@ -130,6 +130,7 @@
   const jobsState = {}; // job_id -> job object
   let ws = null;
   let reconnectTimer = null;
+  let wsPingInterval = null;
 
   // ── WebSocket ────────────────────────────────────────────
   function connect() {
@@ -158,7 +159,8 @@
     });
 
     // Keep-alive ping every 20s
-    setInterval(() => {
+    if (wsPingInterval) clearInterval(wsPingInterval);
+    wsPingInterval = setInterval(() => {
       if (ws && ws.readyState === WebSocket.OPEN) ws.send('ping');
     }, 20000);
   }
