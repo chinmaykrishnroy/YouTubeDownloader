@@ -1,0 +1,36 @@
+name: Download filename regression tests
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  download-filenames:
+    name: Download filenames (${{ matrix.os }} / Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        python-version: [ "3.11", "3.12" ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify ASCII and Unicode download filenames
+        run: >-
+          python -m unittest
+          tests.test_endpoints.TestEndpoints.test_serve_completed_file
+          tests.test_endpoints.TestEndpoints.test_serve_completed_file_with_unicode_title
+          -v

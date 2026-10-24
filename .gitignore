@@ -11,3 +11,4 @@ downloads/*
 Thumbs.db
 .coverage
 .pytest_cache/
+.env

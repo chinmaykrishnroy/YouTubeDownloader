@@ -3,6 +3,7 @@ import sys
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import unquote
 
 # Ensure project root is in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -115,8 +116,34 @@ class TestEndpoints(unittest.TestCase):
             self.assertEqual(resp.headers["content-type"], "application/octet-stream")
             # Verify RFC 5987 Content-Disposition header with clean filename
             self.assertIn("Content-Disposition", resp.headers)
-            self.assertIn("Alan Walker - Fade.mp3", resp.headers["Content-Disposition"])
+            self.assertIn("Alan Walker - Fade.mp3", unquote(resp.headers["Content-Disposition"]))
             self.assertEqual(resp.content, b"ID3\x03\x00\x00\x00mock audio stream")
+        finally:
+            target_file.unlink(missing_ok=True)
+            jobs.pop(job_id, None)
+
+    def test_serve_completed_file_with_unicode_title(self):
+        job_id = "test_unicode_file_job"
+        filename = f"{job_id}.mp3"
+        target_file = DOWNLOADS_DIR / filename
+        payload = b"mock audio stream"
+        target_file.write_bytes(payload)
+        jobs[job_id] = {
+            "id": job_id,
+            "status": "complete",
+            "filename": filename,
+        }
+        try:
+            for title in ("हिन्दी गाना", "日本語の曲", "Music 🎵", "Café", "song\r\n title"):
+                with self.subTest(title=title):
+                    jobs[job_id]["title"] = title
+                    resp = self.client.get(f"/files/{job_id}")
+                    self.assertEqual(resp.status_code, 200)
+                    self.assertEqual(resp.content, payload)
+                    disposition = resp.headers["content-disposition"]
+                    self.assertTrue(disposition.startswith("attachment; filename*=utf-8''"))
+                    self.assertEqual(unquote(disposition.split("''", 1)[1]), f"{title}.mp3")
+                    self.assertTrue(disposition.isascii())
         finally:
             target_file.unlink(missing_ok=True)
             jobs.pop(job_id, None)

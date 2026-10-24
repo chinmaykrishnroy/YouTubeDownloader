@@ -2,6 +2,7 @@ import sys
 import time
 import unittest
 from pathlib import Path
+from urllib.parse import unquote
 
 # Ensure project root is in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -94,7 +95,7 @@ class TestE2ENCSDownload(unittest.TestCase):
         self.assertEqual(file_resp.status_code, 200)
         self.assertEqual(file_resp.headers["content-type"], "application/octet-stream")
         self.assertIn("attachment", file_resp.headers["content-disposition"])
-        self.assertIn("Alan Walker - Fade", file_resp.headers["content-disposition"])
+        self.assertIn("Alan Walker - Fade", unquote(file_resp.headers["content-disposition"]))
         self.assertEqual(len(file_resp.content), file_size_bytes)
         print(f"[E2E OK] Successfully served file via GET /files/{job_id} ({len(file_resp.content)} bytes)")
 
