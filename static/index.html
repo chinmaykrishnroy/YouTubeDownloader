@@ -28,10 +28,28 @@
     .yt-card:hover .thumb-img { transform: scale(1.03); }
     
     .dur-badge {
-      position: absolute; bottom: 8px; left: 8px;
-      background: rgba(0,0,0,.85); color: #fff;
-      font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 4px;
-      letter-spacing: .02em; pointer-events: none;
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
+      left: auto !important;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 5px;
+      border-radius: 4px;
+      letter-spacing: .02em;
+      pointer-events: none;
+      white-space: nowrap;
+      line-height: 1.2;
+      width: auto !important;
+      max-width: max-content;
+      display: inline-block;
+      transition: opacity .15s ease;
+      z-index: 2;
+    }
+    .yt-card:hover .dur-badge {
+      opacity: 0;
     }
 
     .hover-dl {
