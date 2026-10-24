@@ -100,6 +100,22 @@ class TestPrivateSessions(unittest.TestCase):
         self.assertEqual(self.a.get("/files/private-job", headers={"Range": "bytes=0-3"}).status_code, 400)
         self.assertEqual(self.a.get("/files/private-job").content, b"private media")
 
+    def test_https_tunnel_origin_works_over_internal_http(self):
+        from starlette.websockets import WebSocketDisconnect
+        with patch.object(main, "PUBLIC_ORIGIN", "https://ytd.example.com"):
+            with patch.object(main, "search_youtube", return_value=[{"title": "Faded"}]):
+                response = self.a.post("/search", json={"query": "faded"}, headers={"Origin": "https://ytd.example.com"})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["results"][0]["title"], "Faded")
+            with self.a.websocket_connect("/ws", headers={"Origin": "https://ytd.example.com"}) as socket:
+                self.assertEqual(len(socket.receive_json()["jobs"]), 1)
+            self.assertEqual(self.a.delete("/jobs/private-job", headers={"Origin": "https://evil.example", "X-Forwarded-Proto": "https", "X-Forwarded-Host": "evil.example"}).status_code, 403)
+            with self.assertRaises(WebSocketDisconnect):
+                with self.a.websocket_connect("/ws", headers={"Origin": "https://evil.example"}):
+                    pass
+            cookie = TestClient(main.app).get("/session").headers["set-cookie"]
+            self.assertIn("Secure", cookie)
+
     def test_session_cookie_is_private_and_not_persistent(self):
         response = TestClient(main.app).get("/session")
         cookie = response.headers["set-cookie"]

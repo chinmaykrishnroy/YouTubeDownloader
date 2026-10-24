@@ -86,6 +86,14 @@ YTDLP_PROXY = os.environ.get("YTDLP_PROXY", "")
 jobs: dict[str, dict] = {}
 active_connections: set[WebSocket] = set()
 cleanup_task: Optional[asyncio.Task] = None
+# Explicit external origin for TLS-terminating tunnels/reverse proxies.
+PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "").strip().rstrip("/")
+if PUBLIC_ORIGIN:
+    _public_url = urllib.parse.urlsplit(PUBLIC_ORIGIN)
+    if (_public_url.scheme not in ("http", "https") or not _public_url.hostname
+            or _public_url.username or _public_url.password or _public_url.path
+            or _public_url.query or _public_url.fragment):
+        raise ValueError("PUBLIC_ORIGIN must be an HTTP(S) origin without a path")
 SESSION_COOKIE = "yt_session"
 SESSION_DISCONNECT_GRACE_SECONDS = 15
 SESSION_IDLE_SECONDS = 90
@@ -322,11 +330,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def is_allowed_origin(origin: Optional[str], connection) -> bool:
+    scheme = {"ws": "http", "wss": "https"}.get(connection.url.scheme, connection.url.scheme)
+    direct_origin = f"{scheme}://{connection.url.netloc}"
+    return not origin or origin == (PUBLIC_ORIGIN or direct_origin)
+
+
 @app.middleware("http")
 async def private_session_middleware(request: Request, call_next):
     origin = request.headers.get("origin")
-    expected_origin = f"{request.url.scheme}://{request.url.netloc}"
-    if origin and origin != expected_origin and (request.method not in ("GET", "HEAD") or request.url.path.startswith("/files/")):
+    if not is_allowed_origin(origin, request) and (request.method not in ("GET", "HEAD") or request.url.path.startswith("/files/")):
         from fastapi.responses import JSONResponse
         return JSONResponse({"detail": "Cross-origin request denied"}, status_code=403)
     response = await call_next(request)
@@ -335,7 +348,7 @@ async def private_session_middleware(request: Request, call_next):
         if owner not in sessions:
             owner = secrets.token_urlsafe(32)
             sessions[owner] = {"seen": time.monotonic()}
-            response.set_cookie(SESSION_COOKIE, owner, httponly=True, secure=request.url.scheme == "https", samesite="strict")
+            response.set_cookie(SESSION_COOKIE, owner, httponly=True, secure=(PUBLIC_ORIGIN.startswith("https://") or request.url.scheme == "https"), samesite="strict")
     if request.url.path in ("/", "/downloads-page", "/session", "/jobs", "/system-status") or request.url.path.startswith(("/jobs/", "/files/")):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -987,8 +1000,7 @@ async def _delayed_session_cleanup(owner: str):
 async def websocket_endpoint(websocket: WebSocket):
     owner = websocket.cookies.get(SESSION_COOKIE)
     origin = websocket.headers.get("origin")
-    expected_origin = f"{'https' if websocket.url.scheme == 'wss' else 'http'}://{websocket.url.netloc}"
-    if owner not in sessions or (origin and origin != expected_origin):
+    if owner not in sessions or not is_allowed_origin(origin, websocket):
         await websocket.close(code=1008)
         return
     previous_cleanup = sessions[owner].pop("disconnect_task", None)

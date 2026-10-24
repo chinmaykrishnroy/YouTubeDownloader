@@ -164,13 +164,15 @@ If a mandatory component is missing, startup halts immediately with an actionabl
 5. **Storage Quota Manager**: If total cache size exceeds `MAX_DISK_STORAGE_BYTES`, the oldest files are evicted until disk usage is within bounds.
 6. **Stale Partial Cleanup**: Interrupted `.part` files are removed during startup and routine sweeps.
 
+When deploying behind an HTTPS tunnel or reverse proxy, set `PUBLIC_ORIGIN` in `.env` to the public origin (for example, `https://ytd.example.com`). HTTP requests and WebSockets validate against that origin, and HTTPS deployments issue Secure session cookies. Forwarded headers alone do not authorize another origin.
+
 The default cache is a process-specific OS temporary directory, and Docker no longer mounts the shared host downloads folder. Existing files in an old host downloads folder are not exposed or deleted by the new app. Run one application worker/replica: sessions and queues are in memory. A multi-replica deployment needs a shared ownership store and routed workers before scaling out.
 
 ---
 
 ## Testing and CI Pipeline
 
-The project includes a suite of **63 automated unit, integration, and end-to-end tests**:
+The project includes a suite of **64 automated unit, integration, and end-to-end tests**:
 
 ```bash
 # Run full test suite
