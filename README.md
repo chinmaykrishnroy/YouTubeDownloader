@@ -5,7 +5,7 @@
   <h1>YouTube Downloader</h1>
 
   <p>
-    <strong>Asynchronous YouTube media downloader with genuine audio transcoding, real-time WebSocket HUD tracking, and defensive storage management.</strong>
+    <strong>A modern Python web application designed for fast, high-quality media downloads from YouTube. Supports true MP3 audio extraction with embedded ID3 metadata and album artwork, alongside full high-definition video downloads (1080p, 2K, 4K) via FFmpeg muxing. Features a sleek single-page interface with an interactive search player, a draggable floating HUD, real-time WebSocket progress tracking, and automated cache management.</strong>
   </p>
 
   <p>

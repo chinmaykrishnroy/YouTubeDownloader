@@ -4,3 +4,4 @@ yt-dlp
 python-multipart
 aiofiles
 mutagen
+httpx

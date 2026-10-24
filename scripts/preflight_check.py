@@ -32,6 +32,7 @@ def check_dependencies():
         "aiofiles": "aiofiles",
         "mutagen": "mutagen",
         "pydantic": "pydantic",
+        "httpx": "httpx",
     }
     missing = []
     for mod_name, pkg_name in required.items():
